@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+vendor/
+
+# Build outputs
+.next/
+dist/
+build/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+pgdata/
+redisdata/
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+*.coverprofile
+.pytest_cache/
+htmlcov/
+
+# Go (deprecated)
+api-gateway/tmp/
+api-gateway/go.sum
