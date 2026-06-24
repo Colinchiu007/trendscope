@@ -1,13 +1,11 @@
 """FastAPI 依赖注入配置"""
 from functools import lru_cache
-from typing import AsyncGenerator
 
-import redis.asyncio as aioredis
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from trendscope.api.config import settings
-from trendscope.api.models.session import async_session
+from trendscope.api.models.session import get_db
 from trendscope.api.cache.trending_cache import TrendingCache
 from trendscope.api.repositories.trending_repo import TrendingRepo
 from trendscope.api.repositories.article_repo import ArticleRepo
@@ -16,44 +14,42 @@ from trendscope.api.services.article_service import ArticleService
 from trendscope.api.services.user_service import UserService
 
 
-# ─── 数据库会话 ───
+# ─── Redis（可选 — 不可用时传 None，cache 层自动降级）───
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """获取数据库会话（FastAPI Depends）"""
-    async with async_session() as session:
+try:
+    import redis.asyncio as aioredis
+
+    @lru_cache()
+    def _get_redis_pool() -> aioredis.ConnectionPool | None:
         try:
-            yield session
-            await session.commit()
+            return aioredis.ConnectionPool(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                db=settings.REDIS_DB,
+                max_connections=20,
+                decode_responses=True,
+            )
         except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+            return None
 
+    async def get_redis() -> aioredis.Redis | None:
+        pool = _get_redis_pool()
+        if pool is None:
+            return None
+        return aioredis.Redis(connection_pool=pool)
 
-# ─── Redis ───
+except ImportError:
+    aioredis = None
 
-@lru_cache()
-def _get_redis_pool() -> aioredis.ConnectionPool:
-    return aioredis.ConnectionPool(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DB,
-        max_connections=20,
-        decode_responses=True,
-    )
-
-
-async def get_redis() -> aioredis.Redis:
-    pool = _get_redis_pool()
-    return aioredis.Redis(connection_pool=pool)
+    async def get_redis() -> None:
+        return None
 
 
 # ─── 热榜依赖链 ───
 
 def get_trending_service(
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis=Depends(get_redis),
 ) -> TrendingService:
     cache = TrendingCache(redis)
     repo = TrendingRepo(db)
@@ -64,7 +60,7 @@ def get_trending_service(
 
 def get_article_service(
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    redis=Depends(get_redis),
 ) -> ArticleService:
     cache = TrendingCache(redis)
     repo = ArticleRepo(db)

@@ -74,7 +74,7 @@ class PipelineBridge:
             import httpx
             aggregator_url = os.getenv(
                 "AGGREGATOR_API_URL",
-                "http://localhost:8000/api/v1/content/fetch",
+                "http://localhost:8000/api/articles/fetch",
             )
             async with httpx.AsyncClient(timeout=30) as client:
                 for article in articles:
