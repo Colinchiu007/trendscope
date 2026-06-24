@@ -47,6 +47,23 @@ class TrendingTopic(Base):
     platform = relationship("Platform")
 
 
+class CrawlLog(Base):
+    """采集日志"""
+    __tablename__ = "crawl_logs"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    platform_id = Column(Integer, ForeignKey("platforms.id"), nullable=False)
+    status = Column(String(16), nullable=False, default="success")
+    items_count = Column(Integer, default=0)
+    error_message = Column(Text)
+    duration_ms = Column(Integer)
+    started_at = Column(DateTime, nullable=False)
+    finished_at = Column(DateTime)
+    created_at = Column(DateTime, default=now_utc)
+
+    platform = relationship("Platform")
+
+
 class HotArticle(Base):
     __tablename__ = "hot_articles"
 

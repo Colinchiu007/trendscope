@@ -7,23 +7,46 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 
 @pytest.fixture
 def client():
-    """创建 FastAPI TestClient（Mock DB + Redis）"""
-    # Mock 掉数据库和 Redis 依赖
-    with patch("trendscope.api.models.session.async_session", autospec=True), \
-         patch("trendscope.api.dependencies.get_db", autospec=True), \
-         patch("trendscope.api.dependencies.get_redis", autospec=True):
+    """创建 FastAPI TestClient — 通过 dependency_overrides 提供 mock service"""
+    from trendscope.api.main import app
+    from trendscope.api.dependencies import get_trending_service, get_article_service, get_user_service
 
-        from trendscope.api.main import app
-        from httpx import AsyncClient, ASGITransport
+    # ── mock repos ──
+    mock_trending_repo = AsyncMock()
+    mock_trending_repo.get_platforms.return_value = []
+    mock_trending_repo.get_aggregated_trending.return_value = ([], 0)
+    mock_trending_repo.get_platform_trending.return_value = ([], 0)
+    mock_trending_repo.get_trending_history.return_value = []
 
-        transport = ASGITransport(app=app)
-        client = AsyncClient(transport=transport, base_url="http://test")
-        yield client
+    mock_article_repo = AsyncMock()
+    mock_article_repo.list_articles.return_value = ([], 0)
+    mock_article_repo.get_article.return_value = None
+    mock_article_repo.search_articles.return_value = ([], 0)
+
+    mock_user_repo = AsyncMock()
+
+    # ── mock cache（真实 TrendingCache 实例 + None Redis → 全部缓存穿透）──
+    from trendscope.api.cache.trending_cache import TrendingCache
+    fake_cache = TrendingCache(redis_client=None)
+
+    from trendscope.api.services.trending_service import TrendingService
+    from trendscope.api.services.article_service import ArticleService
+    from trendscope.api.services.user_service import UserService
+
+    app.dependency_overrides[get_trending_service] = lambda: TrendingService(mock_trending_repo, fake_cache)
+    app.dependency_overrides[get_article_service] = lambda: ArticleService(mock_article_repo, fake_cache)
+    app.dependency_overrides[get_user_service] = lambda: UserService(mock_user_repo)
+
+    from httpx import AsyncClient, ASGITransport
+    transport = ASGITransport(app=app)
+    client = AsyncClient(transport=transport, base_url="http://test")
+    yield client
+    app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -78,7 +101,6 @@ async def test_get_articles(client):
 @pytest.mark.asyncio
 async def test_search_requires_query(client):
     response = await client.get("/api/v1/articles/search")
-    # 缺少 q 参数应返回校验错误
     assert response.status_code == 422
 
 
@@ -87,20 +109,20 @@ async def test_get_article_not_found(client):
     response = await client.get("/api/v1/articles/99999")
     assert response.status_code == 200
     data = response.json()
-    assert data["code"] == 1002  # 资源不存在
+    assert data["code"] == 1002
 
 
 @pytest.mark.asyncio
 async def test_trending_history_requires_topic_id(client):
     response = await client.get("/api/v1/trending/history")
-    assert response.status_code == 422  # 缺少必填参数
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_register_validation(client):
     response = await client.post("/api/v1/user/register", json={
-        "username": "ab",  # 太短
-        "password": "123",  # 太短
+        "username": "ab",
+        "password": "123",
     })
     assert response.status_code == 422
 
@@ -111,32 +133,29 @@ async def test_login_missing_account(client):
         "account": "",
         "password": "",
     })
-    # FastAPI 校验 minimum length
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_profile_requires_auth(client):
     response = await client.get("/api/v1/user/profile")
-    assert response.status_code == 401  # 未认证
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_admin_requires_auth(client):
     response = await client.get("/api/v1/admin/dashboard")
-    assert response.status_code == 401  # JWT 中间件拦截
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_partner_requires_api_key(client):
     response = await client.get("/api/v1/partner/trending")
-    assert response.status_code == 401  # API Key 中间件拦截
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_single_platform_url_routing(client):
-    """确保 /{platform} 路由正确匹配"""
-    # 已实现的平台
     for platform in ["weibo", "zhihu", "baidu", "bilibili", "toutiao"]:
         response = await client.get(f"/api/v1/trending/{platform}")
         assert response.status_code == 200, f"Platform {platform} route failed"
@@ -144,7 +163,6 @@ async def test_single_platform_url_routing(client):
 
 @pytest.mark.asyncio
 async def test_response_pagination_format(client):
-    """分页响应格式验证"""
     response = await client.get("/api/v1/trending?page=2&page_size=15")
     data = response.json()
     pagination = data["pagination"]

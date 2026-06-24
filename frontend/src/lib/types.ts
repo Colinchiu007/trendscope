@@ -59,3 +59,13 @@ export interface TrendingListData {
 export interface ArticleListData {
   items: HotArticle[];
 }
+
+/** Summary API - each platform with top-3 preview */
+export interface PlatformSummaryItem {
+  code: string;
+  name: string;
+  icon_url: string;
+  category: string;
+  top3: TrendingTopic[];
+  snapshot_at: string | null;
+}
