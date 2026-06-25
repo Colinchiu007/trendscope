@@ -21,7 +21,6 @@ const PLATFORM_COLORS: Record<string, string> = {
   baidu: "#2932E1",
   zhihu: "#0066FF",
   bilibili: "#FB7299",
-  toutiao: "#E13D3D",
   douyin: "#000000",
   xiaohongshu: "#FE2C55",
   youtube: "#FF0000",

@@ -1,0 +1,101 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Layout, Typography, Space, Input, Button, Avatar } from "antd";
+import { FireOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
+import { usePlatforms } from "@/hooks/useTrending";
+import { useProfile } from "@/hooks/useAuth";
+import { HotListCard } from "@/components/trending/HotListCard";
+import { isLoggedIn } from "@/lib/auth";
+
+const { Header, Content, Footer } = Layout;
+const { Title } = Typography;
+
+export default function HomePage() {
+  const router = useRouter();
+  const [searchValue, setSearchValue] = useState("");
+
+  const loggedIn = typeof window !== "undefined" ? isLoggedIn() : false;
+  const { data: profileData } = useProfile();
+  const { data: platformsData } = usePlatforms();
+
+  const platforms = platformsData?.data?.platforms || [];
+
+  const handleSearch = (value: string) => {
+    if (value.trim()) {
+      router.push(`/search?q=${encodeURIComponent(value.trim())}`);
+    }
+  };
+
+  return (
+    <Layout style={{ minHeight: "100vh", background: "#f5f5f5" }}>
+      <Header
+        style={{
+          background: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          borderBottom: "1px solid #f0f0f0", padding: "0 24px",
+          position: "sticky", top: 0, zIndex: 100, gap: 16,
+          height: 56,
+        }}
+      >
+        <Space>
+          <FireOutlined style={{ fontSize: 22, color: "#f5222d", cursor: "pointer" }}
+            onClick={() => router.push("/")} />
+          <Title level={5} style={{ margin: 0 }}>热榜</Title>
+          <span style={{ fontSize: 11, color: "#999", background: "#f5f5f5", padding: "2px 8px", borderRadius: 4 }}>Beta</span>
+        </Space>
+
+        <Input.Search
+          placeholder="搜索热榜..."
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          onSearch={handleSearch}
+          style={{ maxWidth: 280 }}
+          allowClear
+          enterButton={<SearchOutlined />}
+        />
+
+        {loggedIn ? (
+          <Button type="text" icon={<Avatar size={28} icon={<UserOutlined />}
+            src={profileData?.data?.avatar_url} />}
+            onClick={() => router.push("/user/profile")} style={{ padding: 0 }} />
+        ) : (
+          <Button type="primary" ghost size="small" onClick={() => router.push("/user/login")}>登录</Button>
+        )}
+      </Header>
+
+      <Content style={{ padding: "20px 24px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          {platforms.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "#ccc" }}>
+              <Title level={4} type="secondary">暂无平台数据</Title>
+            </div>
+          ) : (
+            <div className="platform-grid">
+              {platforms.map((p) => (
+                <HotListCard key={p.code} platformCode={p.code} platformName={p.name} />
+              ))}
+            </div>
+          )}
+        </div>
+      </Content>
+
+      <Footer style={{ textAlign: "center", color: "#bbb", fontSize: 12 }}>
+        TrendScope 热榜 &copy;2025 - 多平台热榜聚合引擎
+      </Footer>
+
+      <style>{`
+        .platform-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          grid-auto-rows: 1fr;
+          gap: 20px;
+        }
+        @media (min-width: 560px) { .platform-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 800px) { .platform-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1100px) { .platform-grid { grid-template-columns: repeat(4, 1fr); } }
+      `}</style>
+    </Layout>
+  );
+}

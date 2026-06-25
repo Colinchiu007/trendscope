@@ -10,7 +10,8 @@ from spiders.xiaohongshu import XiaohongshuSpider
 from spiders.youtube import YouTubeSpider
 from spiders.x_twitter import XTwitterSpider
 from spiders.weixin_article import WeixinArticleSpider
-from spiders.shipinhao import ShipinhaoSpider
+from spiders.netease import NeteaseSpider
+from spiders.kuaishou import KuaishouSpider
 from spiders.tiktok import TikTokSpider
 
 SPIDER_MAP = {
@@ -19,12 +20,13 @@ SPIDER_MAP = {
     "zhihu": ZhihuSpider,
     "bilibili": BilibiliSpider,
     "toutiao": ToutiaoSpider,
+    "netease": NeteaseSpider,
     "douyin": DouyinSpider,
     "xiaohongshu": XiaohongshuSpider,
     "youtube": YouTubeSpider,
     "x_twitter": XTwitterSpider,
     "weixin_article": WeixinArticleSpider,
-    "shipinhao": ShipinhaoSpider,
+    "kuaishou": KuaishouSpider,
     "tiktok": TikTokSpider,
 }
 
@@ -32,5 +34,5 @@ SPIDER_MAP = {
 def get_spider(platform_code: str) -> BaseSpider:
     spider_cls = SPIDER_MAP.get(platform_code)
     if spider_cls is None:
-        return None
+        raise ValueError(f"Unknown platform: {platform_code}")
     return spider_cls()

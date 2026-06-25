@@ -90,8 +90,11 @@ export default function HomePage() {
         .platform-grid {
           display: grid;
           grid-template-columns: 1fr;
+          grid-auto-rows: 1fr;
           gap: 20px;
+          min-width: 0;
         }
+        .platform-grid > * { min-width: 0; width: 100%; }
         @media (min-width: 560px) { .platform-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (min-width: 800px) { .platform-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (min-width: 1100px) { .platform-grid { grid-template-columns: repeat(4, 1fr); } }

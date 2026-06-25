@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload, joinedload
 from loguru import logger
 
 from trendscope.api.models.database import TrendingTopic, Platform, CrawlLog
@@ -69,6 +70,9 @@ class TrendingRepo:
         if category != "all":
             base = base.where(TrendingTopic.category == category)
 
+        # 预加载 platform 关联（避免 async lazy load 错误）
+        base = base.options(selectinload(TrendingTopic.platform))
+
         # 计数
         count_stmt = select(func.count()).select_from(base.subquery())
         result = await self.db.execute(count_stmt)
@@ -96,6 +100,7 @@ class TrendingRepo:
 
         base = (
             select(TrendingTopic)
+            .options(selectinload(TrendingTopic.platform))
             .where(
                 and_(
                     TrendingTopic.platform_id == platform.id,

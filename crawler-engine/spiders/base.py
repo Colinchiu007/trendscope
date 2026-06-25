@@ -32,6 +32,7 @@ class BaseSpider(ABC):
         self.cookie = CookieManager()
         self.throttle = RequestThrottle()
         self._http_client: Optional[httpx.Client] = None
+        self.logger = logger.bind(platform=self.platform_code)
 
     @property
     def http_client(self) -> httpx.Client:
@@ -52,10 +53,10 @@ class BaseSpider(ABC):
 
     def _build_headers(self) -> dict:
         return {
-            "User-Agent": self.ua.random,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Encoding": "gzip, deflate",
             "Cache-Control": "no-cache",
         }
 
@@ -63,9 +64,11 @@ class BaseSpider(ABC):
     def fetch_trending_list(self) -> list[dict]:
         ...
 
-    def _make_request(self, url: str, method: str = "GET", **kwargs) -> httpx.Response:
+    def _make_request(self, url: str, method: str = "GET", follow_redirects: bool = None, **kwargs) -> httpx.Response:
         self.throttle.wait(self.platform_code)
         try:
+            if follow_redirects is not None:
+                kwargs["follow_redirects"] = follow_redirects
             response = self.http_client.request(method, url, **kwargs)
             response.raise_for_status()
             return response

@@ -1,8 +1,7 @@
-"""Baidu trending spider. Parses <!--s-data:{}--> from SSR HTML."""
+"""Baidu trending spider."""
 import json
 import re
 from datetime import datetime, timezone
-
 from spiders.base import BaseSpider
 
 
@@ -12,33 +11,27 @@ class BaiduSpider(BaseSpider):
     base_url = "https://top.baidu.com/board?tab=realtime"
 
     def fetch_trending_list(self) -> list[dict]:
+        self._http_client = None
         response = self._make_request(self.base_url)
         html = response.text
         now = datetime.now(timezone.utc)
         items = []
-        for match in re.finditer(r"<!--s-data:(.*?)-->", html, re.DOTALL):
+        for m in re.finditer(r"<!--s-data:(.*?)-->", html, re.DOTALL):
             try:
-                raw_data = json.loads(match.group(1))
-                cards = raw_data.get("data", {}).get("cards", []) or raw_data.get("cards", [])
+                raw = json.loads(m.group(1))
+                cards = raw.get("data", {}).get("cards", [])
                 for card in cards:
-                    content_list = card.get("content", [])
-                    if content_list and isinstance(content_list[0], dict) and "content" in content_list[0]:
-                        content_list = content_list[0]["content"]
-                    for idx, item in enumerate(content_list, 1):
+                    cl = card.get("content", [])
+                    if cl and isinstance(cl[0], dict) and "content" in cl[0]:
+                        cl = cl[0]["content"]
+                    for idx, item in enumerate(cl, 1):
                         title = item.get("word", "") or item.get("query", "") or ""
                         if not title.strip():
                             continue
-                        hot_score = item.get("hotScore", 0)
-                        query = item.get("query", title)
-                        items.append({
-                            "rank": idx,
-                            "title": title.strip(),
-                            "hot_value": str(hot_score),
-                            "topic_url": f"https://www.baidu.com/s?wd={query}",
-                            "snapshot_at": now.isoformat(),
-                            "category": "general",
-                        })
-            except (json.JSONDecodeError, KeyError, TypeError):
+                        hs = item.get("hotScore", 0)
+                        q = item.get("query", title)
+                        items.append({"rank": idx, "title": title.strip(), "hot_value": str(hs), "topic_url": f"https://www.baidu.com/s?wd={q}", "snapshot_at": now.isoformat(), "category": "general"})
+            except Exception:
                 continue
         return items[:50]
 

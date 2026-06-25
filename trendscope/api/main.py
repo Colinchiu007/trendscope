@@ -8,7 +8,7 @@ from trendscope.api.middleware.security import (
     SecurityHeadersMiddleware,
     RequestSizeLimitMiddleware,
 )
-from trendscope.api.routers import trending, articles, user, admin, partner
+from trendscope.api.routers import trending, articles, user, admin, admin as admin_public, partner
 
 app = FastAPI(
     title="TrendScope API",
@@ -35,6 +35,7 @@ app.include_router(trending.router, prefix="/api/v1/trending", tags=["热榜"])
 app.include_router(articles.router, prefix="/api/v1/articles", tags=["文章"])
 app.include_router(user.router, prefix="/api/v1/user", tags=["用户"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理后台"])
+app.include_router(admin.public_router, prefix="/api/v1/admin", tags=["管理后台（公开）"])
 app.include_router(partner.router, prefix="/api/v1/partner", tags=["第三方API"])
 
 

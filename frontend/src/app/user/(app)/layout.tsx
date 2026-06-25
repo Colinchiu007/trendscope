@@ -1,7 +1,7 @@
 "use client";
 
 import { Layout, Menu, Typography, Space } from "antd";
-import { UserOutlined, HeartOutlined, BellOutlined, FireOutlined, LogoutOutlined } from "@ant-design/icons";
+import { UserOutlined, HeartOutlined, BellOutlined, FireOutlined, LogoutOutlined, KeyOutlined } from "@ant-design/icons";
 import { useRouter, usePathname } from "next/navigation";
 import { useLogout, useProfile } from "@/hooks/useAuth";
 import { useEffect } from "react";
@@ -24,6 +24,7 @@ export default function UserAppLayout({ children }: { children: React.ReactNode 
     { key: "/user/profile", icon: <UserOutlined />, label: "个人信息" },
     { key: "/user/favorites", icon: <HeartOutlined />, label: "我的收藏" },
     { key: "/user/subscriptions", icon: <BellOutlined />, label: "订阅管理" },
+    { key: "/user/credentials", icon: <KeyOutlined />, label: "平台凭证" },
   ];
 
   return (
@@ -52,8 +53,8 @@ export default function UserAppLayout({ children }: { children: React.ReactNode 
         </Sider>
         <Content style={{ padding: 24, background: "#f5f5f5" }}>
           <div style={{ maxWidth: 720, margin: "0 auto" }}>{children}</div>
-        </Content>
-      </Layout>
+      </Content>
     </Layout>
   );
 }
+Lay

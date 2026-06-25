@@ -8,18 +8,25 @@ from trendscope.api.cache.trending_cache import TrendingCache
 
 
 _FALLBACK_PLATFORMS = [
-    {"id": 1, "code": "weibo", "name": "微博", "icon_url": "", "category": "social", "is_active": True},
-    {"id": 2, "code": "baidu", "name": "百度", "icon_url": "", "category": "general", "is_active": True},
-    {"id": 3, "code": "zhihu", "name": "知乎", "icon_url": "", "category": "social", "is_active": True},
-    {"id": 4, "code": "bilibili", "name": "B站", "icon_url": "", "category": "entertainment", "is_active": True},
-    {"id": 5, "code": "toutiao", "name": "今日头条", "icon_url": "", "category": "news", "is_active": True},
-    {"id": 6, "code": "douyin", "name": "抖音", "icon_url": "", "category": "entertainment", "is_active": True},
-    {"id": 7, "code": "xiaohongshu", "name": "小红书", "icon_url": "", "category": "lifestyle", "is_active": True},
+    {"id": 6, "code": "douyin", "name": "\u6296\u97f3", "icon_url": "", "category": "entertainment", "is_active": True},
+    {"id": 7, "code": "xiaohongshu", "name": "\u5c0f\u7ea2\u4e66", "icon_url": "", "category": "lifestyle", "is_active": True},
+    {"id": 11, "code": "kuaishou", "name": "\u5feb\u624b", "icon_url": "", "category": "entertainment", "is_active": True},
+    {"id": 4, "code": "bilibili", "name": "B\u7ad9", "icon_url": "", "category": "entertainment", "is_active": True},
+    {"id": 1, "code": "weibo", "name": "\u5fae\u535a", "icon_url": "", "category": "social", "is_active": True},
+    {"id": 10, "code": "weixin_article", "name": "\u516c\u4f17\u53f7", "icon_url": "", "category": "news", "is_active": True},
+    {"id": 2, "code": "baidu", "name": "\u767e\u5ea6", "icon_url": "", "category": "general", "is_active": True},
+    {"id": 13, "code": "netease", "name": "\u7f51\u6613\u65b0\u95fb", "icon_url": "", "category": "news", "is_active": True},
+    {"id": 3, "code": "zhihu", "name": "\u77e5\u4e4e", "icon_url": "", "category": "social", "is_active": True},
     {"id": 8, "code": "youtube", "name": "YouTube", "icon_url": "", "category": "video", "is_active": True},
-    {"id": 9, "code": "x_twitter", "name": "X/Twitter", "icon_url": "", "category": "social", "is_active": True},
-    {"id": 10, "code": "weixin_article", "name": "微信公众号", "icon_url": "", "category": "news", "is_active": True},
-    {"id": 11, "code": "shipinhao", "name": "视频号", "icon_url": "", "category": "video", "is_active": True},
     {"id": 12, "code": "tiktok", "name": "TikTok", "icon_url": "", "category": "entertainment", "is_active": True},
+    {"id": 9, "code": "x_twitter", "name": "X/Twitter", "icon_url": "", "category": "social", "is_active": True},
+]
+
+
+_PLATFORM_DISPLAY_ORDER = [
+    "douyin", "xiaohongshu", "kuaishou", "bilibili",
+    "weibo", "weixin_article", "baidu", "netease",
+    "zhihu", "youtube", "tiktok", "x_twitter",
 ]
 
 
@@ -29,9 +36,14 @@ class TrendingService:
         self.repo = repo
         self.cache = cache
 
+    @staticmethod
+    def _sort_platforms(platforms: list[dict]) -> list[dict]:
+        """\u6309\u5e73\u53f0\u987a\u5e8f\u6392\u5e8f"""
+        order = {code: i for i, code in enumerate(_PLATFORM_DISPLAY_ORDER)}
+        return sorted(platforms, key=lambda p: order.get(p["code"], 999))
+
     async def get_aggregated(self, platforms: str = None, category: str = "all",
                              page: int = 1, page_size: int = 20) -> tuple[list[dict], int]:
-        """Tier 1: Aggregated trending feed - compact fields, cross-platform."""
         try:
             if page == 1:
                 cached = await self.cache.get_aggregated(category, page, page_size)
@@ -39,48 +51,20 @@ class TrendingService:
                     return cached.get("items", []), cached.get("total", 0)
             platform_ids = None
             if platforms:
-                codes = [c.strip() for c in platforms.split(",") if c.strip()]
-                if codes:
-                    platform_ids = []
-                    for code in codes:
-                        p = await self.repo.get_platform_by_code(code)
-                        if p:
-                            platform_ids.append(p.id)
+                platform_ids = [int(p) for p in platforms.split(",") if p.strip().isdigit()]
             items, total = await self.repo.get_aggregated_trending(
-                platform_ids, category, page, page_size
+                platform_ids=platform_ids, category=category,
+                page=page, page_size=page_size,
             )
-            result_items = [_serialize_topic_compact(item) for item in items]
+            result = [_serialize_topic(item) for item in items]
             if page == 1:
-                await self.cache.set_aggregated(category, page, page_size, {
-                    "items": result_items, "total": total
-                })
-            return result_items, total
+                await self.cache.set_aggregated(category, page, page_size, {"items": result, "total": total})
+            return result, total
         except Exception as e:
             logger.warning(f"[Service] get_aggregated failed: {e}")
             return [], 0
 
-    async def get_platform_summary(self) -> list[dict]:
-        """Tier 1: Platform list with top-3 preview for each platform."""
-        try:
-            platforms = await self.repo.get_platforms()
-            result = []
-            for p in platforms:
-                items, _ = await self.repo.get_platform_trending(p.code, page=1, page_size=3)
-                top3 = [_serialize_topic_compact(item) for item in items]
-                latest = items[0].snapshot_at.isoformat() if items else None
-                result.append({
-                    "code": p.code, "name": p.name,
-                    "icon_url": p.icon_url or "", "category": p.category,
-                    "top3": top3, "snapshot_at": latest,
-                })
-            return result
-        except Exception as e:
-            logger.warning(f"[Service] get_platform_summary failed: {e}")
-            return []
-
-    async def get_platform_trending(self, platform: str, page: int = 1,
-                                    page_size: int = 50) -> tuple[list[dict], int]:
-        """Tier 2: Single platform full trending list."""
+    async def get_platform_trending(self, platform: str, page: int = 1, page_size: int = 50) -> tuple[list[dict], int]:
         try:
             if page == 1:
                 cached = await self.cache.get_platform_trending(platform, page, page_size)
@@ -89,24 +73,22 @@ class TrendingService:
             items, total = await self.repo.get_platform_trending(platform, page, page_size)
             result_items = [_serialize_topic(item) for item in items]
             if page == 1:
-                await self.cache.set_platform_trending(platform, page, page_size, {
-                    "items": result_items, "total": total
-                })
+                await self.cache.set_platform_trending(platform, page, page_size, {"items": result_items, "total": total})
             return result_items, total
         except Exception as e:
             logger.warning(f"[Service] get_platform_trending({platform}) failed: {e}")
             return [], 0
 
     async def get_history(self, topic_id: int, time_range: str = "24h") -> dict:
-        """Tier 3: Topic heat trend history."""
         try:
             items = await self.repo.get_trending_history(topic_id, time_range)
             if not items:
                 return {}
             history = [{
-                "timestamp": item.snapshot_at.isoformat(),
-                "hot_value": float(item.hot_value_norm or 0),
+                "snapshot_at": item.snapshot_at.isoformat() if item.snapshot_at else "",
                 "rank": item.rank,
+                "hot_value": item.hot_value,
+                "hot_value_norm": float(item.hot_value_norm or 0),
             } for item in items]
             return {
                 "topic_id": topic_id,
@@ -119,7 +101,6 @@ class TrendingService:
             return {}
 
     async def get_platforms(self) -> list[dict]:
-        """Get platform list (cache first, fallback to hardcoded list)."""
         cached = await self.cache.get_platforms()
         if cached:
             return cached
@@ -130,6 +111,7 @@ class TrendingService:
                 "icon_url": p.icon_url or "", "category": p.category,
                 "is_active": p.is_active,
             } for p in platforms]
+            result = self._sort_platforms(result)
             await self.cache.set_platforms(result)
             return result
         except Exception as e:
@@ -138,7 +120,6 @@ class TrendingService:
 
 
 def _serialize_topic_compact(item) -> dict:
-    """Compact serialization - tier 1 aggregated feed."""
     return {
         "id": item.id,
         "platform_code": item.platform.code if item.platform else "",
@@ -154,7 +135,6 @@ def _serialize_topic_compact(item) -> dict:
 
 
 def _serialize_topic(item) -> dict:
-    """Full serialization - tier 2 single platform detail."""
     return {
         "id": item.id,
         "platform": {

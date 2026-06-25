@@ -1,13 +1,8 @@
-"""小红书热榜爬虫 - Playwright 方案
+"""小红书热榜爬虫 - Playwright sync_api 方案
 
 数据来源: https://www.xiaohongshu.com/explore
-小红书有强反爬机制（X-s/X-t 签名参数），优先使用 Playwright 渲染方案。
-
-备用 API（签名破解难度高）:
-  POST https://edith.xiaohongshu.com/api/sns/web/v1/search/notes
-  Headers: X-s, X-t (需要逆向 App 获取签名算法)
+使用 Playwright sync_api 避免 asyncio 嵌套问题。
 """
-import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -22,43 +17,35 @@ class XiaohongshuSpider(BaseSpider):
     use_playwright = True
 
     def fetch_trending_list(self) -> list[dict]:
-        return asyncio.run(self._fetch_with_playwright())
+        return self._fetch_sync()
 
-    async def _fetch_with_playwright(self) -> list[dict]:
-        from playwright.async_api import async_playwright
+    def _fetch_sync(self) -> list[dict]:
+        from playwright.sync_api import sync_playwright
         from anti_anti_spider.fingerprint import FingerprintManager
 
         items = []
-        async with async_playwright() as p:
-            fp = FingerprintManager.get_playwright_stealth_args()
-            viewport = FingerprintManager.get_random_viewport()
-
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--no-sandbox"] + fp,
-            )
-            context = await browser.new_context(
-                viewport=viewport,
+        with sync_playwright() as p:
+            launch_kwargs = FingerprintManager.get_playwright_launch_kwargs()
+            browser = p.chromium.launch(**launch_kwargs)
+            context = browser.new_context(
+                viewport=FingerprintManager.get_random_viewport(),
                 user_agent=self.ua.random,
                 locale="zh-CN",
             )
-
-            # 注入 stealth 脚本（消除 webdriver 痕迹）
-            await context.add_init_script("""
+            context.add_init_script("""
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
                 Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
                 Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN', 'zh', 'en']});
                 window.chrome = {runtime: {}};
             """)
 
-            page = await context.new_page()
+            page = context.new_page()
 
-            # 捕获 XHR 响应
             api_responses = []
-            async def capture(response):
+            def capture(response):
                 if "api/sns/web/v1" in response.url or "homefeed" in response.url:
                     try:
-                        body = await response.json()
+                        body = response.json()
                         api_responses.append({"url": response.url, "data": body})
                     except Exception:
                         pass
@@ -66,40 +53,36 @@ class XiaohongshuSpider(BaseSpider):
             page.on("response", capture)
 
             try:
-                await page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
-                await asyncio.sleep(5)
+                page.goto(self.base_url, wait_until="domcontentloaded", timeout=30000)
+                page.wait_for_timeout(5000)
 
-                # 模拟滚动触发懒加载
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await asyncio.sleep(2)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                page.wait_for_timeout(2000)
 
-                # 尝试从 API 响应提取
                 items = self._parse_api_responses(api_responses)
                 if not items:
-                    items = await self._parse_dom(page)
-
+                    items = self._parse_dom(page)
             finally:
-                await browser.close()
+                browser.close()
 
         return items[:50]
 
     def _parse_api_responses(self, responses: list[dict]) -> list[dict]:
-        """从捕获的 API 响应提取数据"""
         now = datetime.now(timezone.utc).isoformat()
         items = []
 
         for resp in responses:
             data = resp.get("data", resp)
             if not isinstance(data, dict):
-                continue
-
-            # 小红书 API 常见结构: data.items[] 或 data.notes[]
-            note_list = (
-                data.get("data", {}).get("items", [])
-                or data.get("items", [])
-                or data.get("data", {}).get("notes", [])
-                or data.get("notes", [])
-            )
+                if isinstance(data, list):
+                    note_list = data
+                else:
+                    continue
+            else:
+                note_list = (
+                    data.get("items", [])
+                    or data.get("notes", [])
+                )
             if not note_list:
                 continue
 
@@ -139,8 +122,7 @@ class XiaohongshuSpider(BaseSpider):
 
         return items
 
-    async def _parse_dom(self, page) -> list[dict]:
-        """从 DOM 提取（降级方案）"""
+    def _parse_dom(self, page) -> list[dict]:
         now = datetime.now(timezone.utc).isoformat()
         items = []
 
@@ -165,7 +147,7 @@ class XiaohongshuSpider(BaseSpider):
         }
         """
         try:
-            dom_items = await page.evaluate(js_code)
+            dom_items = page.evaluate(js_code)
             for item in dom_items:
                 items.append({
                     "rank": item.get("rank", 0),

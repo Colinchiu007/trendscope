@@ -14,6 +14,9 @@ from sqlalchemy import select, func
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
+# 公开路由器（不需要登录即可访问）
+public_router = APIRouter()
+
 
 @router.get("/dashboard")
 async def dashboard(db: AsyncSession = Depends(get_db)):
@@ -248,3 +251,124 @@ async def update_platform(platform_id: int, db: AsyncSession = Depends(get_db)):
 @router.post("/crawl/trigger")
 async def trigger_crawl():
     return {"code": 0, "message": "采集任务已触发"}
+
+
+# ─── 平台凭证管理 ───
+
+_CREDENTIAL_FIELDS: dict[str, list[dict]] = {
+    "zhihu": [
+        {"key": "cookie", "label": "Cookie", "env_var": "ZHIHU_COOKIE", "type": "textarea"},
+    ],
+    "youtube": [
+        {"key": "api_key", "label": "API Key", "env_var": "YOUTUBE_API_KEY", "type": "password"},
+    ],
+    "tiktok": [
+        {"key": "proxy_url", "label": "代理地址 (Proxy URL)", "env_var": "TIKTOK_PROXY_URL", "type": "password"},
+    ],
+    "x_twitter": [
+        {"key": "bearer_token", "label": "Bearer Token", "env_var": "TWITTER_BEARER_TOKEN", "type": "password"},
+    ],
+}
+
+
+class PlatformCredentials(BaseModel):
+    """单平台凭据更新请求"""
+    config: dict
+
+
+@public_router.get("/platforms/credential-fields")
+async def get_credential_fields():
+    """返回各平台需要的凭证字段定义（前端表单渲染用）"""
+    return {"code": 0, "data": _CREDENTIAL_FIELDS}
+
+
+@router.get("/platforms/{code}/credentials")
+async def get_platform_credentials(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取指定平台的凭证配置（值掩码处理）"""
+    from trendscope.api.models.database import Platform
+    from sqlalchemy import select
+    result = await db.execute(select(Platform).where(Platform.code == code))
+    platform = result.scalar_one_or_none()
+    if not platform:
+        return {"code": 1002, "message": "平台不存在"}
+
+    config = platform.crawl_config or {}
+    fields = _CREDENTIAL_FIELDS.get(code, [])
+
+    # 掩码处理：只返回前4位+后4位，中间用****代替
+    masked = {}
+    for field in fields:
+        key = field["key"]
+        raw = config.get(key, "")
+        if raw and len(raw) > 12:
+            masked[key] = raw[:4] + "****" + raw[-4:]
+        elif raw and len(raw) > 4:
+            masked[key] = raw[:4] + "****"
+        else:
+            masked[key] = "" if not raw else "****"
+        masked[f"{key}_set"] = bool(raw)
+
+    return {
+        "code": 0,
+        "data": {
+            "code": platform.code,
+            "name": platform.name,
+            "masked": masked,
+        },
+    }
+
+
+@router.put("/platforms/{code}/credentials")
+async def update_platform_credentials(
+    code: str,
+    req: PlatformCredentials,
+    db: AsyncSession = Depends(get_db),
+):
+    """更新指定平台的凭证配置"""
+    from trendscope.api.models.database import Platform
+    from sqlalchemy import select
+    result = await db.execute(select(Platform).where(Platform.code == code))
+    platform = result.scalar_one_or_none()
+    if not platform:
+        return {"code": 1002, "message": "平台不存在"}
+
+    # 合并现有配置
+    existing = platform.crawl_config or {}
+    existing.update(req.config)
+    platform.crawl_config = existing
+    await db.flush()
+
+    return {"code": 0, "message": f"{platform.name} 凭证已更新"}
+
+
+@public_router.get("/credentials/export", include_in_schema=False)
+async def export_credentials_as_env(
+    db: AsyncSession = Depends(get_db),
+):
+    """导出所有平台凭证为环境变量格式（供 crawl_all.sh 调用）"""
+    from trendscope.api.models.database import Platform
+    from sqlalchemy import select
+    result = await db.execute(select(Platform))
+    platforms = result.scalars().all()
+
+    env_map: dict[str, str] = {}
+    for p in platforms:
+        fields = _CREDENTIAL_FIELDS.get(p.code, [])
+        config = p.crawl_config or {}
+        for field in fields:
+            env_var = field["env_var"]
+            value = config.get(field["key"], "")
+            if value:
+                env_map[env_var] = value
+
+    # 输出为 shell source-able 格式
+    lines = []
+    for var, val in env_map.items():
+        escaped = val.replace("'", "'\\''")
+        lines.append(f"export {var}='{escaped}'")
+    text = "\n".join(lines)
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(text)

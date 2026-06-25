@@ -1,10 +1,7 @@
-"""微博热搜爬虫
+"""微博热搜爬虫 - Playwright sync_api 方案
 
-数据来源: https://weibo.com/ajax/side/hotSearch
-接口返回 JSON 格式，包含 realtime 热搜、hotband 热bands 等分类。
-
-返回格式:
-    {"data": {"realtime": [{"word": "...", "rank": 1, "num": 123456, "raw_hot": 123456}]}}
+数据来源: https://s.weibo.com/top/summary?cate=realtimehot
+使用 Playwright sync_api 避免 asyncio 嵌套问题。
 """
 from datetime import datetime, timezone
 
@@ -14,45 +11,97 @@ from spiders.base import BaseSpider
 class WeiboSpider(BaseSpider):
     platform_code = "weibo"
     platform_name = "微博"
-    base_url = "https://weibo.com/ajax/side/hotSearch"
+    base_url = "https://s.weibo.com/top/summary?cate=realtimehot"
+    use_playwright = True
 
     def fetch_trending_list(self) -> list[dict]:
-        response = self._make_request(self.base_url)
-        data = response.json()
-        now = datetime.now(timezone.utc)
+        return self._fetch_sync()
+
+    def _fetch_sync(self) -> list[dict]:
+        from playwright.sync_api import sync_playwright
+        from anti_anti_spider.fingerprint import FingerprintManager
 
         items = []
-        realtime = data.get("data", {}).get("realtime", [])
+        with sync_playwright() as p:
+            launch_kwargs = FingerprintManager.get_playwright_launch_kwargs()
+            browser = p.chromium.launch(**launch_kwargs)
+            context = browser.new_context(
+                viewport=FingerprintManager.get_random_viewport(),
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            )
+            page = context.new_page()
 
-        for item in realtime[:50]:
-            rank = item.get("rank", 0)
-            if rank == 0:
-                continue
+            try:
+                page.goto(self.base_url, wait_until="load", timeout=30000)
+                page.wait_for_timeout(2000)
+                items = self._extract_from_dom(page)
+            except Exception:
+                pass
+            finally:
+                browser.close()
 
-            word = item.get("word", "").strip()
-            if not word:
-                continue
+        return items[:50]
 
-            raw_hot = item.get("raw_hot", item.get("num", 0))
-            if isinstance(raw_hot, (int, float)):
-                hot_value = f"{raw_hot}"
-            else:
-                hot_value = str(raw_hot)
+    def _extract_from_dom(self, page) -> list[dict]:
+        now = datetime.now(timezone.utc).isoformat()
+        items = []
 
-            items.append({
-                "rank": rank,
-                "title": word,
-                "hot_value": hot_value,
-                "topic_url": f"https://s.weibo.com/weibo?q=%23{word}%23",
-                "snapshot_at": now.isoformat(),
-                "category": _classify(word),
-            })
+        js_code = """
+        () => {
+            const items = [];
+            const rows = document.querySelectorAll('#pl_top_realtimehot table tbody tr');
+            rows.forEach((row) => {
+                const rankEl = row.querySelector('.td-01');
+                const linkEl = row.querySelector('.td-02 a');
+                const hotEl = row.querySelector('.td-02 span');
+                if (rankEl && linkEl) {
+                    let rank = 0;
+                    const rankText = rankEl.textContent.trim();
+                    if (rankText) {
+                        rank = parseInt(rankText) || 0;
+                    }
+                    const title = linkEl.textContent.trim();
+                    if (!title) return;
+                    let hot_value = hotEl ? hotEl.textContent.trim() : '';
+                    hot_value = hot_value.replace(/\\s+/g, '');
+                    const href = linkEl.getAttribute('href') || '';
+                    const url = href.startsWith('http') ? href : 'https://s.weibo.com' + href;
+                    items.push({
+                        rank: rank,
+                        title: title,
+                        hot_value: hot_value || '0',
+                        url: url
+                    });
+                }
+            });
+            return items;
+        }
+        """
+        try:
+            dom_items = page.evaluate(js_code)
+            for item in dom_items:
+                title = item.get("title", "").strip()
+                if not title:
+                    continue
+                items.append({
+                    "rank": item.get("rank", 0),
+                    "title": title,
+                    "hot_value": item.get("hot_value", "0"),
+                    "topic_url": item.get("url", ""),
+                    "snapshot_at": now,
+                    "category": _classify(title),
+                })
+        except Exception:
+            pass
 
         return items
 
 
 def _classify(title: str) -> str:
-    """简单关键词分类"""
     keywords = {
         "tech": ["AI", "人工智能", "芯片", "5G", "科技", "苹果", "华为", "特斯拉"],
         "entertainment": ["电影", "综艺", "明星", "演唱会", "音乐", "游戏"],
