@@ -1,0 +1,20 @@
+# .clinerules — trendscope 特定硬约束
+
+## 架构
+- rule: "Router → Service → Repository 依赖注入链不能绕过，禁止在 Router 中直接访问数据库"
+- rule: "Repository 层封装所有查询，Router 和 Service 中不能出现 SQL"
+- rule: "所有数据库操作用异步 SQLAlchemy 2.0（select().where()）"
+- rule: "crawler-engine/spiders/ 下每个爬虫必须继承 BaseSpider 并实现 fetch_trending_list()"
+
+## API
+- rule: "API 响应格式统一为 {code, message, data, pagination?}"
+- rule: "错误码统一使用 0/1001/1002/1003/1004/1005/1006"
+- rule: "采集完成后必须调用 cache.invalidate(platform_code) 刷新缓存"
+
+## 爬虫
+- rule: "标准化 dict 格式为 {rank, title, hot_value, topic_url, snapshot_at, category}"
+- rule: "新爬虫注册在 spiders/__init__.py 的 SPIDER_MAP 中添加映射"
+- rule: "防反爬策略（proxy_pool, cookie_manager）通过中间件透明处理，爬虫不自行处理"
+
+## 管道
+- rule: "trending_to_pipeline 功能开关关闭时，pipeline/bridge.py 禁止执行任何联动操作"
