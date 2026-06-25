@@ -1,0 +1,11 @@
+{
+  "name": "trendscope",
+  "description": "多平台热榜聚合引擎",
+  "critical_paths": [
+    "trendscope/api/main.py",
+    "trendscope/crawler/celery_app.py",
+    "trendscope/crawler/tasks.py"
+  ],
+  "pipeline_position": 1,
+  "depends_on": ["shared-models"]
+}

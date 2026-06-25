@@ -12,6 +12,7 @@ setup(
         "uvicorn[standard]>=0.30.0",
         "sqlalchemy[asyncio]>=2.0.31",
         "psycopg2-binary>=2.9.9",
+        "asyncpg>=0.29.0",
         "redis>=5.0.7",
         "httpx>=0.27.0",
         "python-jose[cryptography]>=3.3.0",
@@ -27,7 +28,4 @@ setup(
             "lxml>=5.2.2",
             "playwright>=1.45.0",
             "fake-useragent>=1.5.1",
-            "tenacity>=8.5.0",
-        ],
-    },
-)
+            "tenacity>=8

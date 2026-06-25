@@ -21,7 +21,7 @@ class Settings:
     REDIS_DB: int = int(os.getenv("TS_REDIS_DB", "3"))
 
     # JWT（与已有平台共享密钥）
-    JWT_SECRET: str = os.getenv("PO_SECRET_KEY", "change-me-in-production")
+    JWT_SECRET: str = os.getenv("PO_SECRET_KEY", "")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE: int = 7200
 
@@ -58,3 +58,6 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+
+# ── 启动验证
