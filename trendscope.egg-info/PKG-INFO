@@ -2,7 +2,7 @@ Metadata-Version: 2.4
 Name: trendscope
 Version: 0.1.0
 Summary: 多平台热榜聚合引擎
-Requires-Python: >=3.12
+Requires-Python: >=3.10
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.24; extra == "dev"

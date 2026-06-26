@@ -1,14 +1,17 @@
-"""JWT 认证中间件 — 复用已有平台 python-jose + passlib"""
-import hashlib
-import secrets
+"""JWT 认证中间件 — FastAPI 标准 HTTPBearer + python-jose"""
 from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.ext.asyncio import AsyncSession
 from trendscope.api.config import settings
+from trendscope.api.models.session import get_db
+from trendscope.api.repositories.apikey_repo import ApiKeyRepo
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
 
 # 简化版（后续替换为 shared-models 中的 JWTAuthManager）
 try:
@@ -41,15 +44,9 @@ def decode_token(token: str) -> dict:
     return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
 
 
-def get_current_user(authorization: str = Header(None)) -> dict:
-    """从 Authorization Header 解析当前用户"""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="缺少认证令牌")
-
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(status_code=401, detail="认证格式错误")
-
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """从 HTTPBearer 凭证解析当前用户（纯 JWT 验签，不查 DB）"""
+    token = credentials.credentials
     try:
         payload = decode_token(token)
         return payload
@@ -64,9 +61,21 @@ def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
-def verify_api_key(api_key: str) -> str:
-    """验证 API Key，返回 key_prefix（后续对接数据库）"""
+async def verify_api_key(api_key: str, db: AsyncSession) -> dict | None:
+    """验证 API Key 并返回 payload（含 key_id, user_id, rate_limit, key_prefix）
+
+    调用方负责从 Header 中提取 X-API-Key 并传入。partner.py 有 FastAPI
+    Depends 封装版本，可替代此直接调用。
+    """
     if not api_key:
-        raise HTTPException(status_code=401, detail="缺少 API Key")
-    # TODO: 查询数据库验证 key_hash
-    return api_key[:16]
+        raise HTTPException(status_code=401, detail={"code": 1003, "message": "缺少 API Key"})
+
+    import hashlib
+    repo = ApiKeyRepo(db)
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    payload = await repo.validate(key_hash)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail={"code": 1003, "message": "API Key 无效或已过期"})
+
+    return payload

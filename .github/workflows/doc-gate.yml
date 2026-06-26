@@ -27,6 +27,18 @@ jobs:
             echo "✅ CHANGELOG 已更新"
           fi
 
+      - name: 检查 PRD 同步
+        run: |
+          CHANGED=$(git diff --name-only origin/main)
+          SRC_CHANGED=$(echo "$CHANGED" | grep -c "^src/" || true)
+          PRD_CHANGED=$(echo "$CHANGED" | grep -c "^docs/PRD.md" || true)
+          if [ "$SRC_CHANGED" -gt 0 ] && [ "$PRD_CHANGED" -eq 0 ]; then
+            echo "⚠️  src/ 有变更但 docs/PRD.md 未更新"
+            echo "如果不需要更新 PRD，请在 PR 描述中说明原因"
+          else
+            echo "✅ PRD 同步检查通过"
+          fi
+
   backend-tests:
     name: 后端测试
     runs-on: ubuntu-latest

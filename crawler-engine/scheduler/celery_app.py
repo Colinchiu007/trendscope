@@ -1,24 +1,24 @@
-"""Celery 应用配置"""
-from celery import Celery
+"""
+⚠️ 已废弃 — 统一 Celery 应用请使用 trendscope.crawler.celery_app
 
-app = Celery(
-    "trendscope",
-    broker="redis://localhost:6379/1",
-    backend="redis://localhost:6379/2",
+迁移指引:
+  旧命令:
+    celery -A crawler-engine.scheduler.celery_app worker ...
+    celery -A crawler-engine.scheduler.celery_app beat ...
+  新命令:
+    celery -A trendscope.crawler.celery_app worker ...
+    celery -A trendscope.crawler.celery_app beat ...
+
+此文件仅作为向后兼容的 shim，将在下一迭代中移除。
+"""
+import warnings
+warnings.warn(
+    "crawler-engine/scheduler/celery_app.py 已废弃，"
+    "请使用 trendscope.crawler.celery_app (统一 Celery 实例)",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
-app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="Asia/Shanghai",
-    enable_utc=True,
-    task_acks_late=True,
-    task_reject_on_worker_lost=True,
-    worker_prefetch_multiplier=1,
-    task_soft_time_limit=120,
-    task_time_limit=180,
-)
+from trendscope.crawler.celery_app import app as celery_app
 
-# 自动发现任务
-app.autodiscover_tasks(["scheduler"])
+app = celery_app

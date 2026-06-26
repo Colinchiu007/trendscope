@@ -24,6 +24,6 @@ class CookieManager:
             self._cookies[platform_code].append(cookie)
 
     def refresh(self, platform_code: str):
-        """刷新指定平台的 Cookie 池"""
-        # TODO: 从持久化存储加载 / 通过浏览器获取新 Cookie
-        pass
+        """刷新指定平台的 Cookie 池
+
+        NOTE: 当前使用手动配置的 Cookie（通过 init 或 add 方法注入）。

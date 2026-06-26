@@ -60,4 +60,9 @@ def get_settings() -> Settings:
 settings = get_settings()
 
 
-# ── 启动验证
+# ── 启动验证 ───────────────────────────────────────────────────────────
+if not settings.JWT_SECRET:
+    raise RuntimeError(
+        "PO_SECRET_KEY environment variable is not set. "
+        "Set a strong random key before starting the server."
+    )

@@ -4,7 +4,15 @@ set -e
 
 echo "=== 停止 TrendScope 服务 ==="
 
-for service in api celery-worker beat frontend; do
+# API + 前端用 systemd 管理
+echo "  停止 API"
+systemctl stop trendscope-api 2>/dev/null || echo "  API 未运行"
+
+echo "  停止前端"
+systemctl stop trendscope-frontend 2>/dev/null || echo "  前端未运行"
+
+# Celery Worker + Beat 用 pidfile 停止
+for service in celery-worker beat; do
   pidfile="/var/run/trendscope-${service}.pid"
   if [ -f "$pidfile" ]; then
     pid=$(cat "$pidfile")

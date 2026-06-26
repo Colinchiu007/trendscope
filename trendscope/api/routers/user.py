@@ -1,4 +1,4 @@
-"""用户相关路由"""
+"""用户相关路由（Phase C: register/login 已下线，统一由 orchestrator 认证）"""
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from trendscope.api.dependencies import get_user_service
@@ -6,26 +6,6 @@ from trendscope.api.middleware.auth import get_current_user
 from trendscope.api.services.user_service import UserService
 
 router = APIRouter()
-
-
-# ─── 请求模型 ───
-
-class RegisterReq(BaseModel):
-    username: str = Field(..., min_length=3, max_length=64)
-    email: str | None = None
-    phone: str | None = None
-    password: str = Field(..., min_length=8)
-    verify_code: str | None = None
-
-
-class LoginReq(BaseModel):
-    account: str = Field(..., min_length=1)
-    password: str = Field(..., min_length=1)
-
-
-class SMSLoginReq(BaseModel):
-    phone: str
-    verify_code: str
 
 
 class FavoriteReq(BaseModel):
@@ -38,38 +18,11 @@ class SubscriptionReq(BaseModel):
     notify_email: bool = False
 
 
-# ─── 无需认证 ───
-
-@router.post("/register")
-async def register(req: RegisterReq, svc: UserService = Depends(get_user_service)):
-    try:
-        result = await svc.register(
-            username=req.username,
-            password=req.password,
-            email=req.email,
-            phone=req.phone,
-        )
-        return {"code": 0, "message": "注册成功", "data": result}
-    except ValueError as e:
-        return {"code": 1006, "message": str(e)}
-
-
-@router.post("/login")
-async def login(req: LoginReq, svc: UserService = Depends(get_user_service)):
-    try:
-        result = await svc.login(req.account, req.password)
-        return {"code": 0, "message": "登录成功", "data": result}
-    except ValueError as e:
-        return {"code": 1003, "message": str(e)}
-
-
-@router.post("/login/sms")
-async def login_sms(req: SMSLoginReq, svc: UserService = Depends(get_user_service)):
-    try:
-        result = await svc.login_by_sms(req.phone, req.verify_code)
-        return {"code": 0, "message": "登录成功", "data": result}
-    except ValueError as e:
-        return {"code": 1003, "message": str(e)}
+class UpdateProfileReq(BaseModel):
+    nickname: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    avatar_url: str | None = None
 
 
 # ─── 需要认证 ───
@@ -84,13 +37,6 @@ async def get_profile(
         return {"code": 0, "data": data}
     except ValueError as e:
         return {"code": 1002, "message": str(e)}
-
-
-class UpdateProfileReq(BaseModel):
-    nickname: str | None = None
-    email: str | None = None
-    phone: str | None = None
-    avatar_url: str | None = None
 
 
 @router.put("/profile")

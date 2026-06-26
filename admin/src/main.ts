@@ -15,7 +15,7 @@ const routes = [
   { path: "/", redirect: "/dashboard" },
   { path: "/dashboard", component: Dashboard },
   { path: "/platforms", component: Platforms },
-  { path: "/crawl", component: Dashboard },    // TODO: crawl log view
+  { path: "/crawl", component: Dashboard },    // NOTE: 爬虫日志视图暂用 Dashboard 占位；后续可实现独立日志查看页（按平台/状态/时间筛选）
   { path: "/articles", component: Articles },
   { path: "/users", component: Users },
   { path: "/apikeys", component: ApiKeys },
@@ -26,7 +26,4 @@ const router = createRouter({
   routes,
 });
 
-const app = createApp(App);
-app.use(router);
-app.use(ElementPlus, { locale: { el: { /* zh-CN */ } } });
-app.mount("#app");
+const app = createApp(
