@@ -1,4 +1,5 @@
 """数据写入模块 - 将处理后的数据写入 PostgreSQL 和 Redis"""
+import os
 from datetime import datetime, timezone
 
 from loguru import logger
@@ -6,6 +7,36 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from models.schema import TrendingTopic, HotArticle, Platform, CrawlLog
+
+
+def _invalidate_cache(platform_code: str) -> int:
+    """采集写入后清理 Redis 缓存（同步，直接连 Redis）"""
+    try:
+        import redis as sync_redis
+
+        r = sync_redis.Redis(
+            host=os.getenv("TS_REDIS_HOST", "localhost"),
+            port=int(os.getenv("TS_REDIS_PORT", "6379")),
+            db=int(os.getenv("TS_REDIS_DB", "3")),
+            decode_responses=True,
+        )
+        pattern = "trendscope:trending:*"
+        cursor = 0
+        count = 0
+        while True:
+            cursor, keys = r.scan(cursor, match=pattern, count=100)
+            if keys:
+                r.delete(*keys)
+                count += len(keys)
+            if cursor == 0:
+                break
+        r.close()
+        if count > 0:
+            logger.info(f"[缓存失效] {platform_code}: 清除 {count} 个缓存 key")
+        return count
+    except Exception as e:
+        logger.warning(f"[缓存失效] {platform_code}: Redis 不可用 ({e})")
+        return 0
 
 
 def write_to_db_and_cache(platform_code: str, items: list[dict], db_url: str = None):
@@ -89,6 +120,9 @@ def write_to_db_and_cache(platform_code: str, items: list[dict], db_url: str = N
             session.commit()
             logger.info(f"[写入] {platform_code}: {written} 条存储成功, 耗时 {elapsed_ms}ms")
 
+            # 写入完成后通知缓存层失效（Redis SCAN + DELETE）
+            _invalidate_cache(platform_code)
+
         except Exception as e:
             session.rollback()
             logger.error(f"[写入] {platform_code} 写入失败: {e}")
@@ -108,8 +142,5 @@ def write_to_db_and_cache(platform_code: str, items: list[dict], db_url: str = N
             raise
         finally:
             engine.dispose()
-
-    # TODO: 通过 Redis pub/sub 通知缓存失效
-    # redis_client.publish("trendscope:invalidate", platform_code)
 
     return written

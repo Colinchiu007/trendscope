@@ -1,10 +1,10 @@
 """第三方 API 路由 (X-API-Key 认证)"""
-import hashlib
-
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from trendscope.api.dependencies import get_db, get_trending_service, get_article_service
+from trendscope.api.dependencies import get_db, get_redis, get_trending_service, get_article_service
+from trendscope.api.middleware.auth import verify_api_key as middleware_verify_api_key
+from trendscope.api.middleware.ratelimit import RedisTokenBucket
 from trendscope.api.repositories.apikey_repo import ApiKeyRepo
 from trendscope.api.services.trending_service import TrendingService
 from trendscope.api.services.article_service import ArticleService
@@ -15,21 +15,23 @@ router = APIRouter()
 async def verify_api_key(
     request: Request,
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
     x_api_key: str = Header(None, alias="X-API-Key"),
 ) -> dict:
-    """验证 API Key 并记录用量"""
-    if not x_api_key:
-        raise HTTPException(status_code=401, detail={"code": 1003, "message": "缺少 API Key"})
-
-    repo = ApiKeyRepo(db)
-    key_hash = hashlib.sha256(x_api_key.encode()).hexdigest()
-    payload = await repo.validate(key_hash)
-
+    """验证 API Key 并记录用量（委托 middleware.auth.verify_api_key 做数据库校验）"""
+    payload = await middleware_verify_api_key(x_api_key, db)
     if not payload:
         raise HTTPException(status_code=401, detail={"code": 1003, "message": "API Key 无效或已过期"})
 
-    # 简单限流检查（TODO: 分布式 Redis 滑动窗口）
+    # 分布式限流（Redis 滑动窗口，Redis 不可用时降级到本地令牌桶）
+    rate_limit = payload.get("rate_limit", 60)
+    limiter = RedisTokenBucket(redis, prefix="trendscope:partner:ratelimit")
+    allowed = await limiter.consume(payload.get("key_prefix", "unknown"), rate=rate_limit)
+    if not allowed:
+        raise HTTPException(status_code=429, detail={"code": 1005, "message": "API 请求超限，请稍后再试"})
+
     # 记录用量
+    repo = ApiKeyRepo(db)
     await repo.log_usage(
         api_key_id=payload["key_id"],
         endpoint=request.url.path,
@@ -37,7 +39,6 @@ async def verify_api_key(
         status_code=200,
         ip=request.client.host if request.client else "",
     )
-
     return payload
 
 

@@ -6,7 +6,7 @@ setup(
     version="0.1.0",
     description="多平台热榜聚合引擎",
     packages=find_packages(),
-    python_requires=">=3.12",
+    python_requires=">=3.10",
     install_requires=[
         "fastapi>=0.115.0",
         "uvicorn[standard]>=0.30.0",
@@ -28,4 +28,7 @@ setup(
             "lxml>=5.2.2",
             "playwright>=1.45.0",
             "fake-useragent>=1.5.1",
-            "tenacity>=8
+            "tenacity>=8.5.0",
+        ],
+    },
+)

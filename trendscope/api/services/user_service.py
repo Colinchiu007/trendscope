@@ -72,8 +72,17 @@ class UserService:
         }
 
     async def login_by_sms(self, phone: str, code: str) -> dict:
-        """短信验证码登录"""
-        # TODO: 验证短信验证码
+        """短信验证码登录
+
+        NOTE: 短信验证码验证当前为占位实现（直接通过）。
+        后续集成方式（二选一）：
+        1. 对接第三方 SMS 服务商（阿里云短信 / Twilio Verify），
+           在 user_service 中增加 verify_sms_code(phone, code) 方法
+        2. 使用 Redis 缓存验证码（register/login 时发送，5分钟有效期），
+           此方式更轻量但安全性略低
+        当前注册/登录主流程使用邮箱密码方式，短信登录为辅助通道。
+        """
+        # TODO: 短信验证码验证 — 后续实现
         user = await self.repo.find_by_phone(phone)
         if not user:
             # 新用户自动注册
