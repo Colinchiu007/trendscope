@@ -34,7 +34,7 @@ jobs:
 
       - name: Install runtime deps + project
         run: |
-          pip install loguru httpx sqlalchemy[asyncio] fastapi uvicorn[standard] python-jose[cryptography] passlib[bcrypt] pydantic aiofiles aiohttp
+          pip install loguru httpx sqlalchemy[asyncio] redis fastapi uvicorn[standard] python-jose[cryptography] passlib[bcrypt] pydantic aiofiles aiohttp
           pip install -e . --no-deps
 
       - name: Install test deps
