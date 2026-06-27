@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   test:
@@ -23,23 +22,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('setup.py', 'pyproject.toml') }}
-
       - name: Install shared-models
-        run: |
-          pip install git+https://github.com/Colinchiu007/shared-models.git
+        run: pip install git+https://github.com/Colinchiu007/shared-models.git
 
-      - name: Install dependencies
+      - name: Install runtime deps (pin explicit to avoid resolver failures)
         run: |
-          pip install -e ".[dev]" 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true
-          pip install pytest pytest-asyncio httpx
+          pip install loguru httpx pydantic>=2.0 fastapi>=0.115 uvicorn[standard]>=0.30 python-jose[cryptography]>=3.3 aiohttp>=3.9 aiofiles>=23
+
+      - name: Install project + test deps
+        run: |
+          pip install -e . --no-deps
+          pip install pytest>=8.0 pytest-asyncio>=0.24 pytest-cov>=5.0
 
       - name: Run tests
         env:
           PO_SECRET_KEY: ci-test-secret-key-not-for-production
-        run: |
-          python -m pytest tests/ -v --tb=short -x
+        run: python -m pytest tests/ -v --tb=short -x
