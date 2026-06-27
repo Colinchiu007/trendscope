@@ -40,7 +40,7 @@ Week 9-11  ██████ Phase 4: 优化与上线
 ### 验收标准
 - [ ] `pip install -e /srv/projects/trendscope/` 成功
 - [ ] `uvicorn trendscope.api.main:app --port 8001` 可启动
-- [ ] `from shared_models.trendscope import TrendingTopicModel` 可导入
+- [x] `from shared_models.trendscope import TrendingTopicModel` 可导入
 - [ ] `/health` 端点返回 200
 
 ---
