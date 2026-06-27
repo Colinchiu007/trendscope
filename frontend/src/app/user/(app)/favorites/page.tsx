@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, List, Button, Space, Tag, Spin, Empty, Typography, message } from "antd";
 import { DeleteOutlined, EyeOutlined, HeartFilled, LinkOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api-client";
 
 const { Text } = Typography;
 
@@ -27,32 +28,22 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<FavoriteItem[]>([]);
 
-  const getToken = () =>
-    typeof window !== "undefined" ? localStorage.getItem("trendscope_access_token") : null;
-
   const fetchFavorites = async () => {
-    const token = getToken();
-    if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/user/favorites", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.code === 0) setItems(data.data.items);
+      const res: any = await apiClient.get("/user/favorites");
+      if (res.code === 0) setItems(res.data.items);
+    } catch {
+      message.error("加载收藏失败");
     } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchFavorites(); }, []);
 
   const removeFavorite = async (id: number) => {
-    const token = getToken();
     try {
-      const res = await fetch(`/api/v1/user/favorites/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if ((await res.json()).code === 0) {
+      const res: any = await apiClient.delete(`/user/favorites/${id}`);
+      if (res.code === 0) {
         message.success("已取消收藏");
         setItems((prev) => prev.filter((i) => i.id !== id));
       }

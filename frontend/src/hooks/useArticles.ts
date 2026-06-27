@@ -55,3 +55,52 @@ export function useSearchArticles(q: string, platforms?: string, page = 1) {
     enabled: q.length > 0,
   });
 }
+
+// ── last30days 多源搜索 ────────────────────────────────────────────
+
+interface Last30daysResult {
+  item_id: string;
+  source: string;
+  source_label: string;
+  title: string;
+  body: string;
+  url: string;
+  author: string;
+  published_at: string | null;
+  engagement: Record<string, number>;
+  engagement_score: number;
+  container: string;
+  thumbnail: string | null;
+}
+
+interface Last30daysResponse {
+  code: number;
+  data: {
+    query: string;
+    sources: string[];
+    total: number;
+    results: Last30daysResult[];
+    by_source: Record<string, Last30daysResult[]>;
+    errors: Record<string, string>;
+  };
+}
+
+async function searchLast30days(
+  q: string,
+  sources?: string,
+  perSource = 12,
+  totalMax = 30
+): Promise<Last30daysResponse> {
+  const params: Record<string, string | number> = { q, per_source: perSource, total_max: totalMax };
+  if (sources) params.sources = sources;
+  return apiClient.get("/search/last30days", { params });
+}
+
+export function useLast30daysSearch(q: string, sources?: string) {
+  return useQuery({
+    queryKey: ["last30days", "search", q, sources],
+    queryFn: () => searchLast30days(q, sources),
+    staleTime: 120_000,
+    enabled: q.length > 0,
+  });
+}
