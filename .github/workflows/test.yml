@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('setup.py', 'pyproject.toml') }}
+
+      - name: Install shared-models
+        run: |
+          pip install git+https://github.com/Colinchiu007/shared-models.git
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]" 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run tests
+        env:
+          PO_SECRET_KEY: ci-test-secret-key-not-for-production
+        run: |
+          python -m pytest tests/ -v --tb=short -x
