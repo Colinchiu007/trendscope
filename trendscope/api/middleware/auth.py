@@ -1,10 +1,11 @@
-"""JWT 认证中间件 — FastAPI 标准 HTTPBearer + python-jose"""
+"""JWT 认证中间件 — FastAPI 标准 HTTPBearer + shared-models JWTAuthManager"""
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jose import JWTError
 from passlib.context import CryptContext
+from shared_models.auth import JWTAuthManager
 from sqlalchemy.ext.asyncio import AsyncSession
 from trendscope.api.config import settings
 from trendscope.api.models.session import get_db
@@ -13,44 +14,44 @@ from trendscope.api.repositories.apikey_repo import ApiKeyRepo
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
 
-# 简化版（后续替换为 shared-models 中的 JWTAuthManager）
-try:
-    from shared_models.auth import JWTAuthManager  # type: ignore
-    _auth_manager = JWTAuthManager()
-except ImportError:
-    _auth_manager = None
+# JWTAuthManager 实例 — 统一 JWT 创建/验证
+auth_manager = JWTAuthManager(
+    secret_key=settings.JWT_SECRET,
+    algorithm=settings.JWT_ALGORITHM,
+    access_token_expire_minutes=int(settings.ACCESS_TOKEN_EXPIRE // 60),
+)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return JWTAuthManager.verify_password(plain, hashed)
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return JWTAuthManager.hash_password(password)
 
 
 def create_access_token(user_id: int, username: str, role: str = "user") -> str:
-    expire = datetime.now(timezone.utc) + timedelta(seconds=settings.ACCESS_TOKEN_EXPIRE)
     payload = {
         "user_id": user_id,
         "username": username,
         "role": role,
-        "exp": expire,
     }
-    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    return auth_manager.create_access_token(
+        payload,
+        expires_delta=timedelta(seconds=settings.ACCESS_TOKEN_EXPIRE),
+    )
 
 
 def decode_token(token: str) -> dict:
-    return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+    return auth_manager.decode_token(token)
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     """从 HTTPBearer 凭证解析当前用户（纯 JWT 验签，不查 DB）"""
     token = credentials.credentials
     try:
-        payload = decode_token(token)
-        return payload
-    except JWTError:
+        return auth_manager.decode_token(token)
+    except ValueError:
         raise HTTPException(status_code=403, detail="令牌无效或已过期")
 
 
