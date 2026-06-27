@@ -43,4 +43,4 @@ jobs:
       - name: Run tests (exclude crawler subproject tests)
         env:
           PO_SECRET_KEY: ci-test-secret-key-not-for-production
-        run: python -m pytest tests/ -v --tb=short -x --ignore=tests/test_pipeline.py
+        run: python -m pytest tests/ -v --tb=short --ignore=tests/test_pipeline.py
