@@ -87,11 +87,6 @@ app.conf.update(
             "schedule": 1800.0,
             "args": ("x_twitter",),
         },
-        "crawl-shipinhao": {
-            "task": "trendscope.crawler.tasks.crawl_platform",
-            "schedule": 1800.0,
-            "args": ("shipinhao",),
-        },
         "crawl-tiktok": {
             "task": "trendscope.crawler.tasks.crawl_platform",
             "schedule": 3600.0,

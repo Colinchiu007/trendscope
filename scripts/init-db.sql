@@ -191,7 +191,6 @@ INSERT INTO platforms (code, name, name_en, category, crawl_interval) VALUES
     ('xiaohongshu', '小红书',   'Xiaohongshu',  'lifestyle', 900),
     ('youtube',     'YouTube',  'YouTube',      'video',     900),
     ('weixin_article', '公众号', 'WeChatArticle','article',   1800),
-    ('shipinhao',   '视频号',   'Shipinhao',    'video',     1800),
     ('tiktok',      'TikTok',   'TikTok',       'video',     3600),
     ('x_twitter',   'X',        'X/Twitter',    'social',    1800)
 ON CONFLICT (code) DO NOTHING;

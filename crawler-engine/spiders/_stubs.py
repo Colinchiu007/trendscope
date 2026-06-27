@@ -17,5 +17,4 @@ from spiders.xiaohongshu import XiaohongshuSpider
 from spiders.youtube import YouTubeSpider
 from spiders.x_twitter import XTwitterSpider
 from spiders.weixin_article import WeixinArticleSpider
-from spiders.shipinhao import ShipinhaoSpider
 from spiders.tiktok import TikTokSpider

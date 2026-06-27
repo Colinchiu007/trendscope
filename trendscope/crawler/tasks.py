@@ -73,7 +73,7 @@ def crawl_all_active():
     codes = [
         "weibo", "baidu", "zhihu", "bilibili", "toutiao",
         "douyin", "xiaohongshu", "youtube",
-        "x_twitter", "weixin_article", "shipinhao", "tiktok",
+        "x_twitter", "weixin_article", "tiktok",
     ]
     for code in codes:
         crawl_platform.delay(code)

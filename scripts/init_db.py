@@ -35,7 +35,6 @@ async def main():
         {"code": "youtube", "name": "YouTube", "name_en": "YouTube", "category": "video", "crawl_interval": 900},
         {"code": "x_twitter", "name": "X/Twitter", "name_en": "X/Twitter", "category": "social", "crawl_interval": 1800},
         {"code": "weixin_article", "name": "微信公众号", "name_en": "WeChatArticle", "category": "article", "crawl_interval": 1800},
-        {"code": "shipinhao", "name": "视频号", "name_en": "Shipinhao", "category": "video", "crawl_interval": 1800},
         {"code": "tiktok", "name": "TikTok", "name_en": "TikTok", "category": "video", "crawl_interval": 3600},
     ]
 

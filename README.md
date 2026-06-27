@@ -53,7 +53,7 @@ trendscope/
 | YouTube | youtube | YouTube API v3 | ✅ 已实现 |
 | X | x_twitter | Twitter API v2 | ✅ 已实现 |
 | 公众号 | weixin_article | 搜狗微信搜索 | ✅ 已实现 |
-| 视频号 | shipinhao | Playwright (微信UA) | ✅ 已实现 |
+| 视频号 | shipinhao | Playwright (微信UA) | ❌ 未实现 |
 | TikTok | tiktok | API + Playwright + 境外代理 | ✅ 已实现 |
 
 ## 快速开始
