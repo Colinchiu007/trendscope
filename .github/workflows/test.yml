@@ -25,16 +25,12 @@ jobs:
       - name: Install shared-models
         run: pip install git+https://github.com/Colinchiu007/shared-models.git
 
-      - name: Install runtime deps (pin explicit to avoid resolver failures)
+      - name: Install project dependencies + test deps
         run: |
-          pip install loguru httpx pydantic>=2.0 fastapi>=0.115 uvicorn[standard]>=0.30 python-jose[cryptography]>=3.3 aiohttp>=3.9 aiofiles>=23
+          pip install -e .
+          pip install pytest pytest-asyncio pytest-cov
 
-      - name: Install project + test deps
-        run: |
-          pip install -e . --no-deps
-          pip install pytest>=8.0 pytest-asyncio>=0.24 pytest-cov>=5.0
-
-      - name: Run tests
+      - name: Run tests (exclude crawler subproject tests)
         env:
           PO_SECRET_KEY: ci-test-secret-key-not-for-production
         run: python -m pytest tests/ -v --tb=short -x --ignore=tests/test_pipeline.py
