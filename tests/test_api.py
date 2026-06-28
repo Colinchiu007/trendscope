@@ -118,11 +118,6 @@ async def test_trending_history_requires_topic_id(client):
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
-        "username": "ab",
-        "password": "123",
-    })
-    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
