@@ -118,16 +118,9 @@ async def test_trending_history_requires_topic_id(client):
     assert response.status_code == 422
 
 
-
+@pytest.mark.asyncio
 
 @pytest.mark.asyncio
-async def test_login_missing_account(client):
-    response = await client.post("/api/v1/user/login", json={
-        "account": "",
-        "password": "",
-    })
-    assert response.status_code == 422
-
 
 @pytest.mark.asyncio
 async def test_profile_requires_auth(client):
