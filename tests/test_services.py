@@ -77,7 +77,7 @@ class TestTrendingService:
         """默认 page=1 page_size=20"""
         await service.get_aggregated()
         mock_repo.get_aggregated_trending.assert_called_with(
-            platform_ids=None, category="all", page=1, page_size=20
+            None, "all", 1, 20
         )
 
     @pytest.mark.asyncio
@@ -191,14 +191,14 @@ class TestJWTToken:
 
     def test_decode_invalid_token(self):
         from trendscope.api.middleware.auth import decode_token
-        
+        from jose import JWTError
 
-        with pytest.raises((ValueError,)):
+        with pytest.raises(JWTError):
             decode_token("invalid.token.here")
 
     def test_empty_token(self):
         from trendscope.api.middleware.auth import decode_token
-        
+        from jose import JWTError
 
-        with pytest.raises((ValueError,)):
+        with pytest.raises(JWTError):
             decode_token("")

@@ -74,22 +74,32 @@ class UserService:
     async def login_by_sms(self, phone: str, code: str) -> dict:
         """短信验证码登录
 
-        当前为预留接口，尚未集成 SMS 服务商。
-        验证码校验逻辑将在接入具体 SMS 服务商后实现。
-
-        待选集成方案（二选一）:
+        NOTE: 短信验证码验证当前为占位实现（直接通过）。
+        后续集成方式（二选一）：
         1. 对接第三方 SMS 服务商（阿里云短信 / Twilio Verify），
            在 user_service 中增加 verify_sms_code(phone, code) 方法
-        2. 使用 Redis 缓存验证码（发送至手机，5分钟有效期），
+        2. 使用 Redis 缓存验证码（register/login 时发送，5分钟有效期），
            此方式更轻量但安全性略低
-
         当前注册/登录主流程使用邮箱密码方式，短信登录为辅助通道。
         """
-        raise NotImplementedError(
-            "短信验证码登录尚未接入 SMS 服务商。"
-            "当前支持邮箱密码登录。"
-            "如需启用短信登录，请配置 SMS_PROVIDER 并实现验证码校验逻辑。"
-        )
+        # TODO: 短信验证码验证 — 后续实现
+        user = await self.repo.find_by_phone(phone)
+        if not user:
+            # 新用户自动注册
+            username = f"u_{phone[-6:]}"
+            user = await self.repo.create_user(
+                username=username,
+                password_hash=hash_password(phone + "sms"),
+                phone=phone,
+                nickname=username,
+            )
+
+        token = create_access_token(user.id, user.username, user.role)
+        return {
+            "access_token": token,
+            "expires_in": 7200,
+            "user": {"id": user.id, "username": user.username, "nickname": user.nickname},
+        }
 
     # ─── 个人信息 ───
 

@@ -1,35 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { Card, Descriptions, Form, Input, Button, message, Spin, Avatar } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import { useProfile } from "@/hooks/useAuth";
-import { apiClient } from "@/lib/api-client";
 
 export default function ProfilePage() {
   const { data: profile, isLoading } = useProfile();
   const user = profile?.data;
-  const [saving, setSaving] = useState(false);
-  const [form] = Form.useForm();
 
   if (isLoading) return <div style={{ textAlign: "center", padding: 60 }}><Spin size="large" /></div>;
   if (!user) return <p style={{ textAlign: "center", color: "#999" }}>请先登录</p>;
-
-  const handleSave = async (values: { nickname?: string; email?: string }) => {
-    setSaving(true);
-    try {
-      const res: any = await apiClient.put("/user/profile", values);
-      if (res.code === 0) {
-        message.success("保存成功");
-      } else {
-        message.error(res.message || "保存失败");
-      }
-    } catch {
-      message.error("网络错误，保存失败");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div>
@@ -47,17 +27,15 @@ export default function ProfilePage() {
           <Descriptions.Item label="注册时间">{user.created_at ? new Date(user.created_at).toLocaleDateString("zh-CN") : ""}</Descriptions.Item>
         </Descriptions>
 
-        <Form form={form} layout="vertical" style={{ marginTop: 24 }} onFinish={handleSave}>
-          <Form.Item label="昵称" name="nickname">
+        <Form layout="vertical" style={{ marginTop: 24 }}>
+          <Form.Item label="昵称">
             <Input placeholder={user.nickname || "设置昵称"} />
           </Form.Item>
-          <Form.Item label="邮箱" name="email">
+          <Form.Item label="邮箱">
             <Input placeholder={user.email || "绑定邮箱"} />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit" block loading={saving}>
-              保存修改
-            </Button>
+            <Button type="primary" block disabled>保存修改（开发中）</Button>
           </Form.Item>
         </Form>
       </Card>

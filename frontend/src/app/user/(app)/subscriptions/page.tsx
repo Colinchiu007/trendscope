@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import { Card, List, Button, Space, Tag, Spin, Empty, Typography, Popconfirm, message, Select, Checkbox } from "antd";
 import { BellOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { PLATFORMS } from "@/lib/constants";
-import { apiClient } from "@/lib/api-client";
 
 const { Text } = Typography;
 
@@ -24,13 +23,17 @@ export default function SubscriptionsPage() {
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
+  const token = typeof window !== "undefined" ? localStorage.getItem("trendscope_access_token") : null;
+
   const fetchSubs = async () => {
+    if (!token) return;
     setLoading(true);
     try {
-      const res: any = await apiClient.get("/user/subscriptions");
-      if (res.code === 0) setSubs(res.data.items);
-    } catch {
-      message.error("加载订阅失败");
+      const res = await fetch("/api/v1/user/subscriptions", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.code === 0) setSubs(data.data.items);
     } finally { setLoading(false); }
   };
 
@@ -38,8 +41,11 @@ export default function SubscriptionsPage() {
 
   const deleteSub = async (id: number) => {
     try {
-      const res: any = await apiClient.delete(`/user/subscriptions/${id}`);
-      if (res.code === 0) {
+      const res = await fetch(`/api/v1/user/subscriptions/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if ((await res.json()).code === 0) {
         message.success("已取消订阅");
         setSubs((prev) => prev.filter((s) => s.id !== id));
       }
@@ -48,11 +54,15 @@ export default function SubscriptionsPage() {
 
   const createSub = async () => {
     try {
-      const res: any = await apiClient.post("/user/subscriptions", {
-        keywords: ["热点", "热搜"],
-        notify_email: false,
+      const res = await fetch("/api/v1/user/subscriptions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ keywords: ["热点", "热搜"], notify_email: false }),
       });
-      if (res.code === 0) {
+      if ((await res.json()).code === 0) {
         message.success("订阅创建成功");
         setShowCreate(false);
         fetchSubs();

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Layout, Typography, Button, Space, List, Tag, Pagination, Result } from "antd";
+import { Layout, Typography, Button, Space, List, Tag, Pagination } from "antd";
 import { ArrowLeftOutlined, FireOutlined } from "@ant-design/icons";
 import { usePlatformTrending } from "@/hooks/useTrending";
 import { PLATFORM_COLORS, PLATFORM_LOGOS } from "@/lib/constants";
@@ -20,7 +20,7 @@ export default function PlatformTrendingPage() {
   const [page, setPage] = useState(1);
   const pageSize = 30;
 
-  const { data, isLoading, isError, error, refetch } = usePlatformTrending(platform, page);
+  const { data, isLoading } = usePlatformTrending(platform, page);
   const items: TrendingTopic[] = data?.data?.items || [];
   const total = data?.pagination?.total || 0;
   const accentColor = PLATFORM_COLORS[platform] || "#666";
@@ -41,66 +41,51 @@ export default function PlatformTrendingPage() {
 
       <Content style={{ padding: "16px 24px" }}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          {isError ? (
-            <Result
-              status="error"
-              title="加载失败"
-              subTitle={error instanceof Error ? error.message : "无法获取热榜数据，请稍后重试"}
-              extra={
-                <Button type="primary" onClick={() => refetch()}>
-                  重新加载
-                </Button>
-              }
-            />
-          ) : (
-            <>
-              <List
-                loading={isLoading}
-                dataSource={items}
-                renderItem={(item: TrendingTopic, idx: number) => {
-                  const rank = (page - 1) * pageSize + idx + 1;
-                  const rankColor = RANK_COLORS[rank] || "#f0f0f0";
-                  const rankTextColor = RANK_COLORS[rank] ? "#fff" : "#999";
-                  return (
-                    <List.Item
-                      style={{ cursor: "pointer", padding: "10px 12px", borderRadius: 8, transition: "all 0.2s" }}
-                      className="list-item-hover"
-                      onClick={() => item.topic_url && window.open(item.topic_url, "_blank")}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
-                        <div style={{
-                          width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-                          background: rankColor, color: rankTextColor,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 12, fontWeight: 700,
-                        }}>
-                          {rank}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={{ fontSize: 15 }}>{item.title}</Text>
-                          <div style={{ marginTop: 4 }}>
-                            {item.hot_value && (
-                              <Tag icon={<FireOutlined />} color={accentColor} style={{ fontSize: 11 }}>
-                                {item.hot_value}
-                              </Tag>
-                            )}
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                              {item.platform?.name}
-                            </Text>
-                          </div>
-                        </div>
+          <List
+            loading={isLoading}
+            dataSource={items}
+            renderItem={(item: TrendingTopic, idx: number) => {
+              const rank = (page - 1) * pageSize + idx + 1;
+              const rankColor = RANK_COLORS[rank] || "#f0f0f0";
+              const rankTextColor = RANK_COLORS[rank] ? "#fff" : "#999";
+              return (
+                <List.Item
+                  style={{ cursor: "pointer", padding: "10px 12px", borderRadius: 8, transition: "all 0.2s" }}
+                  className="list-item-hover"
+                  onClick={() => item.topic_url && window.open(item.topic_url, "_blank")}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                      background: rankColor, color: rankTextColor,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 12, fontWeight: 700,
+                    }}>
+                      {rank}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={{ fontSize: 15 }}>{item.title}</Text>
+                      <div style={{ marginTop: 4 }}>
+                        {item.hot_value && (
+                          <Tag icon={<FireOutlined />} color={accentColor} style={{ fontSize: 11 }}>
+                            {item.hot_value}
+                          </Tag>
+                        )}
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          {item.platform?.name}
+                        </Text>
                       </div>
-                    </List.Item>
-                  );
-                }}
-              />
-              {total > pageSize && (
-                <div style={{ textAlign: "center", marginTop: 16 }}>
-                  <Pagination current={page} pageSize={pageSize} total={total}
-                    onChange={setPage} showSizeChanger={false} size="small" />
-                </div>
-              )}
-            </>
+                    </div>
+                  </div>
+                </List.Item>
+              );
+            }}
+          />
+          {total > pageSize && (
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <Pagination current={page} pageSize={pageSize} total={total}
+                onChange={setPage} showSizeChanger={false} size="small" />
+            </div>
           )}
         </div>
       </Content>
