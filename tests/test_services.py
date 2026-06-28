@@ -191,14 +191,14 @@ class TestJWTToken:
 
     def test_decode_invalid_token(self):
         from trendscope.api.middleware.auth import decode_token
-        from jose import JWTError
+        
 
-        with pytest.raises(JWTError):
+        with pytest.raises((ValueError,)):
             decode_token("invalid.token.here")
 
     def test_empty_token(self):
         from trendscope.api.middleware.auth import decode_token
-        from jose import JWTError
+        
 
-        with pytest.raises(JWTError):
+        with pytest.raises((ValueError,)):
             decode_token("")
