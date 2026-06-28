@@ -77,7 +77,7 @@ class TestTrendingService:
         """默认 page=1 page_size=20"""
         await service.get_aggregated()
         mock_repo.get_aggregated_trending.assert_called_with(
-            platform_ids=None, category="all", page=1, page_size=20
+            None, "all", 1, 20
         )
 
     @pytest.mark.asyncio
