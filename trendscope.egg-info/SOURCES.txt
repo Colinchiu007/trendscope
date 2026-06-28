@@ -36,11 +36,13 @@ trendscope/api/repositories/user_repo.py
 trendscope/api/routers/__init__.py
 trendscope/api/routers/admin.py
 trendscope/api/routers/articles.py
+trendscope/api/routers/last30days.py
 trendscope/api/routers/partner.py
 trendscope/api/routers/trending.py
 trendscope/api/routers/user.py
 trendscope/api/services/__init__.py
 trendscope/api/services/article_service.py
+trendscope/api/services/last30days_search.py
 trendscope/api/services/trending_service.py
 trendscope/api/services/user_service.py
 trendscope/crawler/__init__.py
