@@ -53,8 +53,8 @@ export default function UserAppLayout({ children }: { children: React.ReactNode 
         </Sider>
         <Content style={{ padding: 24, background: "#f5f5f5" }}>
           <div style={{ maxWidth: 720, margin: "0 auto" }}>{children}</div>
-      </Content>
+        </Content>
+      </Layout>
     </Layout>
   );
 }
-Lay

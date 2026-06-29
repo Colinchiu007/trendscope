@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layout, Typography, Space, Input, Button, Avatar } from "antd";
+import { Layout, Typography, Space, Input, Button, Avatar, Skeleton, Card } from "antd";
 import { FireOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
 import { usePlatforms } from "@/hooks/useTrending";
 import { useProfile } from "@/hooks/useAuth";
@@ -18,7 +18,7 @@ export default function HomePage() {
 
   const loggedIn = typeof window !== "undefined" ? isLoggedIn() : false;
   const { data: profileData } = useProfile();
-  const { data: platformsData } = usePlatforms();
+  const { data: platformsData, isLoading } = usePlatforms();
 
   const platforms = platformsData?.data?.platforms || [];
 
@@ -27,6 +27,16 @@ export default function HomePage() {
       router.push(`/search?q=${encodeURIComponent(value.trim())}`);
     }
   };
+
+  const renderSkeletonGrid = () => (
+    <div className="platform-grid">
+      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+        <Card key={i} style={{ borderRadius: 12, height: 180 }}>
+          <Skeleton active avatar paragraph={{ rows: 2 }} />
+        </Card>
+      ))}
+    </div>
+  );
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#f5f5f5" }}>
@@ -68,7 +78,9 @@ export default function HomePage() {
       <Content style={{ padding: "20px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           {/* Platform grid - same layout as DailyHot */}
-          {platforms.length === 0 ? (
+          {isLoading ? (
+            renderSkeletonGrid()
+          ) : platforms.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "#ccc" }}>
               <Title level={4} type="secondary">暂无平台数据</Title>
             </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Layout, Form, Input, Button, Typography, Card, message, Space, Tabs } from "antd";
-import { UserOutlined, LockOutlined, PhoneOutlined, FireOutlined } from "@ant-design/icons";
+import { UserOutlined, LockOutlined, FireOutlined } from "@ant-design/icons";
 import { useLogin } from "@/hooks/useAuth";
 
 const { Header, Content } = Layout;
@@ -13,7 +13,6 @@ const { Title, Text } = Typography;
 export default function LoginPage() {
   const router = useRouter();
   const login = useLogin();
-  const [mode, setMode] = useState<"password" | "sms">("password");
 
   const onFinish = (values: any) => {
     login.mutate(
@@ -49,44 +48,24 @@ export default function LoginPage() {
             登录
           </Title>
 
-          <Tabs activeKey={mode} onChange={(k) => setMode(k as any)} centered items={[
+          <Tabs activeKey="password" onChange={() => {}} centered items={[
             { key: "password", label: "密码登录" },
-            { key: "sms", label: "短信登录" },
+            { key: "sms", label: "短信登录", disabled: true },
           ]} />
 
-          {mode === "password" ? (
-            <Form onFinish={onFinish} size="large" autoComplete="off">
-              <Form.Item name="account" rules={[{ required: true, message: "请输入用户名/邮箱/手机号" }]}>
-                <Input prefix={<UserOutlined />} placeholder="用户名 / 邮箱 / 手机号" />
-              </Form.Item>
-              <Form.Item name="password" rules={[{ required: true, message: "请输入密码" }]}>
-                <Input.Password prefix={<LockOutlined />} placeholder="密码" />
-              </Form.Item>
-              <Form.Item>
-                <Button type="primary" htmlType="submit" block loading={login.isPending}>
-                  登录
-                </Button>
-              </Form.Item>
-            </Form>
-          ) : (
-            <Form size="large">
-              <Form.Item name="phone" rules={[{ required: true, message: "请输入手机号" }]}>
-                <Input prefix={<PhoneOutlined />} placeholder="手机号" />
-              </Form.Item>
-              <Form.Item name="code" rules={[{ required: true, message: "请输入验证码" }]}>
-                <Input.Search
-                  placeholder="验证码"
-                  enterButton="获取验证码"
-                  onSearch={() => {}}
-                />
-              </Form.Item>
-              <Form.Item>
-                <Button type="primary" htmlType="submit" block disabled>
-                  登录
-                </Button>
-              </Form.Item>
-            </Form>
-          )}
+          <Form onFinish={onFinish} size="large" autoComplete="off">
+            <Form.Item name="account" rules={[{ required: true, message: "请输入用户名/邮箱/手机号" }]}>
+              <Input prefix={<UserOutlined />} placeholder="用户名 / 邮箱 / 手机号" />
+            </Form.Item>
+            <Form.Item name="password" rules={[{ required: true, message: "请输入密码" }]}>
+              <Input.Password prefix={<LockOutlined />} placeholder="密码" />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block loading={login.isPending}>
+                登录
+              </Button>
+            </Form.Item>
+          </Form>
 
           <div style={{ textAlign: "center" }}>
             <Text type="secondary" style={{ fontSize: 13 }}>
