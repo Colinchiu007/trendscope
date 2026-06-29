@@ -30,17 +30,16 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('setup.py', 'pyproject.toml') }}
 
       - name: Install shared-models
-        run: pip install git+https://github.com/Colinchiu007/shared-models.git
-
-      - name: Install runtime deps + project
         run: |
-          pip install loguru httpx sqlalchemy[asyncio] redis asyncpg fastapi uvicorn[standard] python-jose[cryptography] passlib[bcrypt] pydantic aiofiles aiohttp
-          pip install -e . --no-deps
+          pip install git+https://github.com/Colinchiu007/shared-models.git
 
-      - name: Install test deps
-        run: pip install pytest pytest-asyncio pytest-cov
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]" 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true
+          pip install pytest pytest-asyncio httpx
 
-      - name: Run tests (exclude crawler subproject tests)
+      - name: Run tests
         env:
           PO_SECRET_KEY: ci-test-secret-key-not-for-production
-        run: python -m pytest tests/ -v --tb=short --ignore=tests/test_pipeline.py
+        run: |
+          python -m pytest tests/ -v --tb=short -x
