@@ -135,3 +135,82 @@ class AdminRepo:
     async def _count(self, model) -> int:
         result = await self.db.execute(select(func.count()).select_from(model))
         return result.scalar() or 0
+
+
+    # ─── 采集实时状态（Task 17）───
+
+    async def get_crawl_status(self) -> list[dict]:
+        """获取当前所有平台的采集状态（最近一次采集记录）"""
+        from sqlalchemy import text
+        stmt = text("""
+            SELECT DISTINCT ON (cl.platform_id)
+                cl.platform_id,
+                p.code as platform_code,
+                p.name as platform_name,
+                cl.status,
+                cl.items_count,
+                cl.error_message,
+                cl.started_at,
+                cl.finished_at
+            FROM crawl_logs cl
+            JOIN platforms p ON cl.platform_id = p.id
+            ORDER BY cl.platform_id, cl.created_at DESC
+        """)
+        result = await self.db.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "platform_id": r[0],
+                "platform_code": r[1],
+                "platform_name": r[2],
+                "status": r[3],
+                "items_count": r[4],
+                "error_message": r[5],
+                "started_at": r[6].isoformat() if r[6] else "",
+                "finished_at": r[7].isoformat() if r[7] else "",
+            }
+            for r in rows
+        ]
+
+    # ─── 批量审核（Task 18）───
+
+    async def batch_audit_articles(self, article_ids: list[int], status: str) -> int:
+        """批量审核文章"""
+        from sqlalchemy import update
+        from trendscope.api.models.database import HotArticle
+        stmt = (
+            update(HotArticle)
+            .where(HotArticle.id.in_(article_ids))
+            .values(status=status)
+        )
+        result = await self.db.execute(stmt)
+        await self.db.flush()
+        return result.rowcount
+
+    # ─── 用户详情统计（Task 19）───
+
+    async def get_user_stats(self, user_id: int) -> dict:
+        """获取用户统计数据"""
+        from sqlalchemy import select, func
+        from trendscope.api.models.database import UserFavorite, UserSubscription
+
+        # 收藏数
+        result = await self.db.execute(
+            select(func.count()).where(UserFavorite.user_id == user_id)
+        )
+        favorites_count = result.scalar() or 0
+
+        # 订阅数
+        result = await self.db.execute(
+            select(func.count()).where(
+                UserSubscription.user_id == user_id,
+                UserSubscription.is_active == True,
+            )
+        )
+        subscriptions_count = result.scalar() or 0
+
+        return {
+            "user_id": user_id,
+            "favorites_count": favorites_count,
+            "subscriptions_count": subscriptions_count,
+        }

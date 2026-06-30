@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Layout, Typography, Space, Input, Button, Avatar, Skeleton, Card } from "antd";
-import { FireOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
+import { FireOutlined, SearchOutlined, UserOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { usePlatforms } from "@/hooks/useTrending";
 import { useProfile } from "@/hooks/useAuth";
 import { HotListCard } from "@/components/trending/HotListCard";
@@ -15,12 +15,15 @@ const { Title } = Typography;
 export default function HomePage() {
   const router = useRouter();
   const [searchValue, setSearchValue] = useState("");
+  const [activeCategory, setActiveCategory] = useState("all");
 
   const loggedIn = typeof window !== "undefined" ? isLoggedIn() : false;
   const { data: profileData } = useProfile();
   const { data: platformsData, isLoading } = usePlatforms();
 
   const platforms = platformsData?.data?.platforms || [];
+  const categories = ["all", ...new Set(platforms.map(p => p.category).filter(Boolean))];
+  const filteredPlatforms = activeCategory === "all" ? platforms : platforms.filter(p => p.category === activeCategory);
 
   const handleSearch = (value: string) => {
     if (value.trim()) {
@@ -77,7 +80,27 @@ export default function HomePage() {
 
       <Content style={{ padding: "20px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          {/* Platform grid - same layout as DailyHot */}
+          {/* Category filter tabs */}
+          {!isLoading && categories.length > 1 && (
+            <div style={{ marginBottom: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {categories.map((cat) => (
+                <button key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    padding: "6px 18px", borderRadius: 20, cursor: "pointer", fontSize: 13,
+                    border: activeCategory === cat ? "none" : "1px solid #d9d9d9",
+                    background: activeCategory === cat ? "#f5222d" : "#fff",
+                    color: activeCategory === cat ? "#fff" : "#666",
+                    fontWeight: activeCategory === cat ? 600 : 400,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {cat === "all" ? <><AppstoreOutlined /> 全部</> : cat}
+                </button>
+              ))}
+            </div>
+          )}
+          {/* Platform grid */}
           {isLoading ? (
             renderSkeletonGrid()
           ) : platforms.length === 0 ? (
@@ -86,7 +109,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="platform-grid">
-              {platforms.map((p) => (
+              {filteredPlatforms.map((p) => (
                 <HotListCard key={p.code} platformCode={p.code} platformName={p.name} />
               ))}
             </div>

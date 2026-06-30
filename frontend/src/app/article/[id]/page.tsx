@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { Layout, Typography, Button, Space, Image, Tag, Divider, Spin } from "antd";
+import { Layout, Typography, Button, Space, Image, Tag, Divider, Spin, Card } from "antd";
 import {
   ArrowLeftOutlined,
   EyeOutlined,
@@ -11,7 +11,7 @@ import {
   LinkOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { useArticle } from "@/hooks/useArticles";
+import { useArticle, useRelatedArticles } from "@/hooks/useArticles";
 
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -28,7 +28,9 @@ export default function ArticleDetailPage() {
   const id = parseInt((params.id as string) || "0", 10);
 
   const { data, isLoading, error } = useArticle(id);
+  const { data: relatedData, isLoading: relatedLoading } = useRelatedArticles(id);
   const article = data?.data;
+  const relatedItems = relatedData?.data?.items || [];
 
   if (isLoading) {
     return (
@@ -167,6 +169,54 @@ export default function ArticleDetailPage() {
             <div style={{ textAlign: "center", color: "#bbb", fontSize: 12, marginTop: 16 }}>
               发布于 {new Date(article.publish_at).toLocaleString("zh-CN")}
             </div>
+          )}
+
+          {/* ── 相关文章推荐 ── */}
+          {relatedItems.length > 0 && (
+            <>
+              <Divider />
+              <section style={{ marginTop: 32 }}>
+                <Title level={5} style={{ marginBottom: 16 }}>相关文章</Title>
+                {relatedLoading ? (
+                  <div style={{ textAlign: "center", padding: "20px 0" }}>
+                    <Spin />
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {relatedItems.map((rel) => (
+                      <Card
+                        key={rel.id}
+                        hoverable
+                        size="small"
+                        style={{ borderRadius: 8 }}
+                        bodyStyle={{ padding: "12px 16px" }}
+                        onClick={() => router.push(`/article/${rel.id}`)}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text strong style={{ fontSize: 14 }} ellipsis={{ tooltip: rel.title }}>
+                              {rel.title}
+                            </Text>
+                            {rel.summary && (
+                              <Paragraph
+                                type="secondary"
+                                ellipsis={{ rows: 1 }}
+                                style={{ fontSize: 12, margin: "4px 0 0" }}
+                              >
+                                {rel.summary}
+                              </Paragraph>
+                            )}
+                          </div>
+                          <Tag color="blue" style={{ flexShrink: 0, fontSize: 11 }}>
+                            {rel.platform.name}
+                          </Tag>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </>
           )}
         </article>
       </Content>

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrendScope 管理后台</title>
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #303133; }
+#app { height: 100vh; display: flex; flex-direction: column; }
+.app-header { background: #fff; border-bottom: 1px solid #ebeef5; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; flex-shrink: 0; }
+.app-header h3 { margin: 0; font-size: 16px; }
+.version { color: #999; font-size: 12px; }
+.app-body { display: flex; flex: 1; overflow: hidden; }
+.app-sidebar { width: 200px; background: #fafafa; border-right: 1px solid #ebeef5; overflow-y: auto; flex-shrink: 0; }
+.app-main { flex: 1; padding: 24px; overflow-y: auto; background: #f5f5f5; }
+.app-main h2 { font-size: 18px; margin-bottom: 20px; }
+.stat-card { text-align: center; padding: 8px 0; }
+.stat-value { font-size: 28px; font-weight: 700; color: #409eff; }
+.stat-label { font-size: 13px; color: #999; margin-top: 4px; }
+.chart-box { width: 100%; height: 300px; }
+.crawl-card { cursor: pointer; transition: all .2s; }
+.crawl-card:hover { border-color: #409eff; }
+.crawl-card .stat-value { font-size: 22px; }
+.nav-item { padding: 12px 20px; cursor: pointer; color: #606266; font-size: 14px; border-left: 3px solid transparent; transition: all .2s; }
+.nav-item:hover { background: #ecf5ff; color: #409eff; }
+.nav-item.active { background: #ecf5ff; color: #409eff; border-left-color: #409eff; font-weight: 600; }
+.page-enter { animation: fadeIn .2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.sensitive-tag { margin: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="app-header">
+    <h3>TrendScope 管理后台</h3>
+    <span class="version">v0.1.0</span>
+  </div>
+  <div class="app-body">
+    <div class="app-sidebar">
+      <div v-for="item in navItems" :key="item.key"
+        :class="['nav-item', { active: currentPage === item.key }]"
+        @click="navigate(item.key)">{{ item.label }}</div>
+    </div>
+    <div class="app-main">
+      <!-- ====== DASHBOARD ====== -->
+      <div v-if="currentPage === 'dashboard'" class="page-enter">
+        <h2>数据面板</h2>
+        <el-row :gutter="16" style="margin-bottom:16px">
+          <el-col :span="6" v-for="c in stats" :key="c.key"><el-card shadow="hover"><div class="stat-card"><div class="stat-value">{{ c.value }}</div><div class="stat-label">{{ c.label }}</div></div></el-card></el-col>
+        </el-row>
+        <el-row :gutter="16" style="margin-bottom:16px">
+          <el-col :span="6" v-for="c in stats2" :key="c.key"><el-card shadow="hover"><div class="stat-card"><div class="stat-value">{{ c.value }}</div><div class="stat-label">{{ c.label }}</div></div></el-card></el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="16"><el-card><template #header>访问趋势（7天）</template><div id="trendChart" class="chart-box"></div></el-card></el-col>
+          <el-col :span="8"><el-card><template #header>平台分布</template><div id="pieChart" class="chart-box"></div></el-card></el-col>
+        </el-row>
+      </div>
+
+      <!-- ====== PLATFORMS ====== -->
+      <div v-if="currentPage === 'platforms'" class="page-enter">
+        <h2>平台管理</h2>
+        <el-table :data="platforms" stripe v-loading="loading.platforms">
+          <el-table-column prop="code" label="代码" width="120" />
+          <el-table-column prop="name" label="名称" width="120" />
+          <el-table-column prop="category" label="分类" width="100" />
+          <el-table-column prop="crawl_interval" label="采集间隔(s)" width="120" />
+          <el-table-column label="状态" width="100"><template #default="{row}"><el-tag :type="row.is_active?'success':'danger'" size="small">{{ row.is_active?'启用':'禁用' }}</el-tag></template></el-table-column>
+          <el-table-column label="操作" width="180"><template #default="{row}">
+            <el-button type="primary" link size="small" @click="editPlatform(row)">编辑</el-button>
+            <el-button type="primary" link size="small" @click="triggerCrawl(row)">手动抓取</el-button>
+          </template></el-table-column>
+        </el-table>
+        <el-dialog v-model="platEditVis" title="编辑平台配置" width="500px">
+          <el-form :model="platForm" label-width="110px">
+            <el-form-item label="采集间隔(s)"><el-input-number v-model="platForm.crawl_interval" :min="30" :max="86400" /></el-form-item>
+            <el-form-item label="启用"><el-switch v-model="platForm.is_active" active-text="是" inactive-text="否" /></el-form-item>
+          </el-form>
+          <template #footer><el-button @click="platEditVis=false">取消</el-button><el-button type="primary" @click="savePlatform">保存</el-button></template>
+        </el-dialog>
+      </div>
+
+      <!-- ====== CRAWL ====== -->
+      <div v-if="currentPage === 'crawl'" class="page-enter">
+        <h2>采集调度</h2>
+        <el-row :gutter="16" style="margin-bottom:20px">
+          <el-col :span="6" v-for="p in crawlStatus" :key="p.code">
+            <el-card class="crawl-card" shadow="hover" @click="triggerCrawl(p)">
+              <div class="stat-card">
+                <div class="stat-value" :style="{color: p.status==='success'?'#67c23a':'#909399'}">{{ p.name }}</div>
+                <div class="stat-label">{{ p.lastTime || '暂无记录' }}</div>
+                <el-tag :type="p.status==='success'?'success':'info'" size="small" style="margin-top:4px">{{ p.status==='success'?'正常':'待采集' }}</el-tag>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+        <div style="margin-bottom:16px;display:flex;gap:8px">
+          <el-button type="primary" @click="triggerAllCrawls" :loading="loading.crawlTrigger">触发全部采集</el-button>
+        </div>
+        <el-card><template #header>采集日志</template>
+          <el-table :data="crawlLogs" stripe v-loading="loading.crawlLogs" empty-text="暂无采集记录">
+            <el-table-column prop="platform_id" label="平台ID" width="80" />
+            <el-table-column label="状态" width="100"><template #default="{row}"><el-tag :type="row.status==='success'?'success':'danger'" size="small">{{ row.status }}</el-tag></template></el-table-column>
+            <el-table-column prop="items_count" label="条数" width="80" />
+            <el-table-column prop="duration_ms" label="耗时(ms)" width="100" />
+            <el-table-column prop="started_at" label="开始时间" width="180" />
+            <el-table-column prop="error_message" label="错误信息" min-width="200" show-overflow-tooltip />
+          </el-table>
+          <el-pagination v-model:current-page="crawlPage" :page-size="20" :total="crawlTotal" layout="prev,pager,next" @current-change="fetchCrawlLogs" style="margin-top:12px;justify-content:center" />
+        </el-card>
+      </div>
+
+      <!-- ====== ARTICLES + SENSITIVE WORDS ====== -->
+      <div v-if="currentPage === 'articles'" class="page-enter">
+        <h2>内容审核</h2>
+        <el-tabs v-model="articleTab" @tab-change="fetchArticles">
+          <el-tab-pane label="待审核" name="pending" />
+          <el-tab-pane label="已通过" name="approved" />
+          <el-tab-pane label="已驳回" name="rejected" />
+          <el-tab-pane label="敏感词管理" name="sensitive" />
+        </el-tabs>
+        <!-- Article review -->
+        <div v-if="articleTab !== 'sensitive'">
+          <div style="margin-bottom:12px;display:flex;gap:8px" v-if="articleTab==='pending' && selectedArticles.length>0">
+            <el-button type="success" size="small" @click="batchAudit('approved')">批量通过 ({{ selectedArticles.length }})</el-button>
+            <el-button type="danger" size="small" @click="batchAudit('rejected')">批量驳回 ({{ selectedArticles.length }})</el-button>
+            <el-button size="small" @click="selectedArticles=[]">取消选择</el-button>
+          </div>
+          <el-table :data="articles" stripe v-loading="loading.articles" @selection-change="onArticleSelect">
+            <el-table-column type="selection" width="50" v-if="articleTab==='pending'" />
+            <el-table-column prop="id" label="ID" width="70" />
+            <el-table-column prop="title" label="标题" min-width="260" show-overflow-tooltip />
+            <el-table-column prop="platform_id" label="平台" width="80" />
+            <el-table-column prop="read_count" label="阅读" width="80" />
+            <el-table-column label="状态" width="80"><template #default="{row}"><el-tag :type="row.status==='approved'?'success':row.status==='rejected'?'danger':'warning'" size="small">{{ row.status }}</el-tag></template></el-table-column>
+            <el-table-column label="操作" width="200"><template #default="{row}">
+              <el-button v-if="row.status==='pending'" type="success" link size="small" @click="auditArticle(row.id,'approved')">通过</el-button>
+              <el-button v-if="row.status==='pending'" type="danger" link size="small" @click="auditArticle(row.id,'rejected')">驳回</el-button>
+              <el-button type="primary" link size="small" @click="row.source_url&&window.open(row.source_url,'_blank')">原文</el-button>
+            </template></el-table-column>
+          </el-table>
+          <el-pagination v-model:current-page="articlePage" :page-size="20" :total="articleTotal" layout="prev,pager,next" @current-change="fetchArticles" style="margin-top:12px;justify-content:center" />
+        </div>
+        <!-- Sensitive words -->
+        <div v-if="articleTab === 'sensitive'">
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <el-input v-model="newWord" placeholder="输入敏感词" style="width:300px" @keyup.enter="addSensitiveWord" clearable />
+            <el-button type="primary" @click="addSensitiveWord" :disabled="!newWord.trim()">添加</el-button>
+          </div>
+          <el-tag v-for="w in sensitiveWords" :key="w" class="sensitive-tag" closable type="danger" @close="deleteSensitiveWord(w)" size="large">{{ w }}</el-tag>
+          <el-empty v-if="sensitiveWords.length===0" description="暂无敏感词" style="padding:40px 0" />
+        </div>
+      </div>
+
+      <!-- ====== USERS ====== -->
+      <div v-if="currentPage === 'users'" class="page-enter">
+        <h2>用户管理</h2>
+        <el-table :data="users" stripe v-loading="loading.users" @row-click="showUserDetail">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="username" label="用户名" width="150" />
+          <el-table-column prop="email" label="邮箱" min-width="200" />
+          <el-table-column prop="phone" label="手机号" width="140" />
+          <el-table-column label="角色" width="80"><template #default="{row}"><el-tag :type="row.role==='admin'?'danger':'info'" size="small">{{ row.role }}</el-tag></template></el-table-column>
+          <el-table-column label="状态" width="80"><template #default="{row}"><el-tag :type="row.status==='active'?'success':'danger'" size="small">{{ row.status }}</el-tag></template></el-table-column>
+          <el-table-column prop="created_at" label="注册时间" width="180" />
+          <el-table-column label="操作" width="160"><template #default="{row}">
+            <el-button v-if="row.status==='active'" type="danger" link size="small" @click.stop="updateUserStatus(row.id,'banned')">封禁</el-button>
+            <el-button v-else type="success" link size="small" @click.stop="updateUserStatus(row.id,'active')">解封</el-button>
+          </template></el-table-column>
+        </el-table>
+        <el-pagination v-model:current-page="userPage" :page-size="20" :total="userTotal" layout="prev,pager,next" @current-change="fetchUsers" style="margin-top:12px;justify-content:center" />
+        <!-- User detail dialog -->
+        <el-dialog v-model="userDetailVis" :title="'用户详情 - '+selectedUser?.username" width="600px">
+          <el-descriptions :column="2" border v-if="selectedUser">
+            <el-descriptions-item label="ID">{{ selectedUser.id }}</el-descriptions-item>
+            <el-descriptions-item label="用户名">{{ selectedUser.username }}</el-descriptions-item>
+            <el-descriptions-item label="邮箱">{{ selectedUser.email || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="手机号">{{ selectedUser.phone || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="角色">{{ selectedUser.role }}</el-descriptions-item>
+            <el-descriptions-item label="状态"><el-tag :type="selectedUser.status==='active'?'success':'danger'" size="small">{{ selectedUser.status }}</el-tag></el-descriptions-item>
+            <el-descriptions-item label="注册时间" :span="2">{{ selectedUser.created_at || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-dialog>
+      </div>
+
+      <!-- ====== API KEYS ====== -->
+      <div v-if="currentPage === 'apikeys'" class="page-enter">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="margin:0">API Key 管理</h2>
+          <el-button type="primary" @click="showCreateKey">创建 API Key</el-button>
+        </div>
+        <el-table :data="keys" stripe v-loading="loading.keys">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="name" label="名称" width="180" />
+          <el-table-column prop="key_prefix" label="Key前缀" width="160" />
+          <el-table-column prop="rate_limit" label="QPM" width="80" />
+          <el-table-column label="状态" width="80"><template #default="{row}"><el-tag :type="row.is_active?'success':'danger'" size="small">{{ row.is_active?'活跃':'已撤销' }}</el-tag></template></el-table-column>
+          <el-table-column prop="last_used_at" label="最后使用" width="180" />
+          <el-table-column label="过期时间" width="180"><template #default="{row}">{{ row.expires_at || '-' }}</template></el-table-column>
+          <el-table-column label="操作" width="100"><template #default="{row}"><el-button v-if="row.is_active" type="danger" link size="small" @click="revokeKey(row.id)">撤销</el-button></template></el-table-column>
+        </el-table>
+        <!-- Create dialog with calendar picker -->
+        <el-dialog v-model="keyCreateVis" title="创建 API Key" width="520px" @closed="newKeyValue=null">
+          <el-form :model="keyForm" label-width="110px">
+            <el-form-item label="用户ID" required><el-input-number v-model="keyForm.user_id" :min="1" /></el-form-item>
+            <el-form-item label="名称" required><el-input v-model="keyForm.name" placeholder="如: 数据分析平台" /></el-form-item>
+            <el-form-item label="QPM 限制"><el-input-number v-model="keyForm.rate_limit" :min="10" :max="10000" /></el-form-item>
+            <el-form-item label="到期日期"><el-date-picker v-model="keyForm.expires_at" type="date" placeholder="选择到期日" style="width:100%" value-format="YYYY-MM-DD" /></el-form-item>
+          </el-form>
+          <template #footer><el-button @click="keyCreateVis=false">取消</el-button><el-button type="primary" @click="createKey" :loading="keyCreating">创建</el-button></template>
+        </el-dialog>
+        <el-dialog v-model="newKeyValue" title="API Key 创建成功" width="520px">
+          <el-alert type="warning" :closable="false" style="margin-bottom:12px">请立即复制并安全保存，关闭后无法再次查看。</el-alert>
+          <el-input :model-value="newKeyValue" readonly><template #append><el-button @click="copyKey">复制</el-button></template></el-input>
+        </el-dialog>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\/script>
+<script src="https://unpkg.com/element-plus"><\/script>
+<script src="https://unpkg.com/echarts"><\/script>
+<script>
+const { createApp, ref, onMounted, nextTick, reactive } = Vue
+
+function api(path, opts={}) {
+  const token = localStorage.getItem('trendscope_access_token')
+  return fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: token ? 'Bearer '+token : '', ...opts.headers } })
+    .then(r => r.json())
+}
+
+const app = createApp({
+  setup() {
+    // ─── Navigation ───
+    const navItems = [
+      { key: 'dashboard', label: '数据面板' },
+      { key: 'platforms', label: '平台管理' },
+      { key: 'crawl', label: '采集调度' },
+      { key: 'articles', label: '内容审核' },
+      { key: 'users', label: '用户管理' },
+      { key: 'apikeys', label: 'API Key 管理' },
+    ]
+    const currentPage = ref('dashboard')
+    function navigate(key) { currentPage.value = key; setTimeout(initCharts, 100) }
+
+    // ─── Dashboard ───
+    const stats = ref([{key:'active_platforms',label:'活跃平台',value:'-'},{key:'active_users',label:'活跃用户',value:'-'},{key:'today_articles',label:'今日文章',value:'-'},{key:'today_topics',label:'今日话题',value:'-'}])
+    const stats2 = ref([{key:'today_api_calls',label:'API调用',value:'-'},{key:'crawl_success_rate',label:'采集成功率',value:'-'},{key:'total_articles',label:'累计文章',value:'-'},{key:'total_topics',label:'累计话题',value:'-'}])
+    let trendChart=null, pieChart=null
+    function initCharts() {
+      if (currentPage.value !== 'dashboard') return
+      const tc = document.getElementById('trendChart'), pc = document.getElementById('pieChart')
+      if (!tc || !pc) return
+      if (!trendChart) trendChart = echarts.init(tc)
+      if (!pieChart) pieChart = echarts.init(pc)
+    }
+    async function fetchDashboard() {
+      const d = (await api('/api/v1/admin/dashboard')).data
+      if (!d) return
+      const s = d.stats || {}
+      stats.value = [{key:'active_platforms',label:'活跃平台',value:s.active_platforms??'-'},{key:'active_users',label:'活跃用户',value:s.active_users??'-'},{key:'today_articles',label:'今日文章',value:s.today_articles??'-'},{key:'today_topics',label:'今日话题',value:s.today_topics??'-'}]
+      stats2.value = [{key:'today_api_calls',label:'API调用',value:s.today_api_calls??'-'},{key:'crawl_success_rate',label:'采集成功率',value:(s.crawl_success_rate??'-')+'%'},{key:'total_articles',label:'累计文章',value:s.total_articles??'-'},{key:'total_topics',label:'累计话题',value:s.total_topics??'-'}]
+      await nextTick()
+      initCharts()
+      if (trendChart && d.visit_trend) trendChart.setOption({tooltip:{trigger:'axis'},grid:{left:'3%',right:'4%',bottom:'3%',containLabel:true},xAxis:{type:'category',data:d.visit_trend.map(x=>x.date?.slice(5)||'')},yAxis:{type:'value',minInterval:1},series:[{type:'line',smooth:true,data:d.visit_trend.map(x=>x.count),areaStyle:{opacity:.25},lineStyle:{width:2},itemStyle:{color:'#409eff'}}]})
+      if (pieChart && d.platform_distribution) pieChart.setOption({tooltip:{trigger:'item'},series:[{type:'pie',radius:['30%','60%'],data:d.platform_distribution.map(x=>({name:x.name||'-',value:x.count})),label:{show:true,formatter:'{b}: {c}'}}]})
+    }
+
+    // ─── Platforms ───
+    const platforms = ref([])
+    const loading = reactive({platforms:false,articles:false,users:false,keys:false,crawlLogs:false,crawlTrigger:false})
+    const platEditVis = ref(false)
+    const platForm = ref({id:0,crawl_interval:300,is_active:true})
+    async function fetchPlatforms() {
+      loading.platforms = true
+      const d = (await api('/api/v1/admin/platforms')).data
+      if (d) platforms.value = d.platforms
+      loading.platforms = false
+    }
+    function editPlatform(row) { platForm.value = {id:row.id,crawl_interval:row.crawl_interval,is_active:row.is_active}; platEditVis.value = true }
+    async function savePlatform() {
+      await api('/api/v1/admin/platforms/'+platForm.value.id, {method:'PUT',body:JSON.stringify(platForm.value)})
+      ElMessage.success('保存成功'); platEditVis.value = false; fetchPlatforms()
+    }
+    async function triggerCrawl(row) {
+      await api('/api/v1/admin/crawl/trigger',{method:'POST',body:JSON.stringify({platform_id:row.id,force:false})})
+      ElMessage.success('已触发 '+(row.name||'')+' 采集')
+    }
+
+    // ─── Crawl ───
+    const crawlStatus = ref([])
+    const crawlLogs = ref([])
+    const crawlPage = ref(1)
+    const crawlTotal = ref(0)
+    function buildCrawlStatus() {
+      crawlStatus.value = platforms.value.length > 0 ? platforms.value.map(p => {
+        const logs = crawlLogs.value.filter(l => l.platform_id === p.id)
+        const last = logs[0]
+        return { code: p.code, name: p.name, id: p.id, status: last?.status || 'pending', lastTime: last?.started_at?.slice(0,16) || null }
+      }) : []
+    }
+    async function fetchCrawlLogs() {
+      loading.crawlLogs = true
+      const d = (await api('/api/v1/admin/crawl/logs?page='+crawlPage.value+'&page_size=20')).data
+      if (d) { crawlLogs.value = d.items; crawlTotal.value = d.pagination?.total || 0 }
+      loading.crawlLogs = false
+      buildCrawlStatus()
+    }
+    async function triggerAllCrawls() {
+      loading.crawlTrigger = true
+      for (const p of platforms.value) { await api('/api/v1/admin/crawl/trigger',{method:'POST',body:JSON.stringify({platform_id:p.id,force:false})}) }
+      ElMessage.success('已触发全部平台采集')
+      loading.crawlTrigger = false
+      fetchCrawlLogs()
+    }
+
+    // ─── Articles ───
+    const articleTab = ref('pending')
+    const articles = ref([])
+    const articlePage = ref(1)
+    const articleTotal = ref(0)
+    const selectedArticles = ref([])
+    function onArticleSelect(rows) { selectedArticles.value = rows.map(r => r.id) }
+    async function fetchArticles() {
+      if (articleTab.value === 'sensitive') { fetchSensitiveWords(); return }
+      loading.articles = true
+      const d = (await api('/api/v1/admin/articles?status='+articleTab.value+'&page='+articlePage.value+'&page_size=20')).data
+      if (d) { articles.value = d.items; articleTotal.value = d.pagination?.total || 0 }
+      loading.articles = false
+    }
+    async function auditArticle(id, status) {
+      const r = await api('/api/v1/admin/articles/'+id, {method:'PATCH',body:JSON.stringify({status})})
+      if (r.code===0) { ElMessage.success('审核完成'); fetchArticles() }
+    }
+    async function batchAudit(status) {
+      for (const id of selectedArticles.value) { await api('/api/v1/admin/articles/'+id, {method:'PATCH',body:JSON.stringify({status})}) }
+      ElMessage.success('批量'+ (status==='approved'?'通过':'驳回') +'完成 ('+selectedArticles.value.length+' 条)')
+      selectedArticles.value = []; fetchArticles()
+    }
+
+    // ─── Sensitive Words ───
+    const sensitiveWords = ref([])
+    const newWord = ref('')
+    async function fetchSensitiveWords() {
+      const d = (await api('/api/v1/admin/sensitive-words')).data
+      if (d) sensitiveWords.value = d.words
+    }
+    async function addSensitiveWord() {
+      if (!newWord.value.trim()) return
+      const r = await api('/api/v1/admin/sensitive-words', {method:'POST',body:JSON.stringify({word:newWord.value.trim()})})
+      if (r.code===0) { sensitiveWords.value = r.data.words; newWord.value = ''; ElMessage.success('已添加') }
+    }
+    async function deleteSensitiveWord(word) {
+      const r = await api('/api/v1/admin/sensitive-words/'+encodeURIComponent(word), {method:'DELETE'})
+      if (r.code===0) { sensitiveWords.value = r.data.words; ElMessage.success('已删除') }
+    }
+
+    // ─── Users ───
+    const users = ref([])
+    const userPage = ref(1)
+    const userTotal = ref(0)
+    const userDetailVis = ref(false)
+    const selectedUser = ref(null)
+    async function fetchUsers() {
+      loading.users = true
+      const d = (await api('/api/v1/admin/users?page='+userPage.value+'&page_size=20')).data
+      if (d) { users.value = d.items; userTotal.value = d.pagination?.total || 0 }
+      loading.users = false
+    }
+    function showUserDetail(row) { selectedUser.value = row; userDetailVis.value = true }
+    async function updateUserStatus(id, status) {
+      try { await ElMessageBox.confirm('确认'+(status==='banned'?'封禁':'解封')+'？') } catch { return }
+      const r = await api('/api/v1/admin/users/'+id, {method:'PATCH',body:JSON.stringify({status})})
+      if (r.code===0) { ElMessage.success('更新成功'); fetchUsers() }
+    }
+
+    // ─── API Keys ───
+    const keys = ref([])
+    const keyCreateVis = ref(false)
+    const keyCreating = ref(false)
+    const newKeyValue = ref(null)
+    const keyForm = ref({user_id:1,name:'',rate_limit:100,expires_at:''})
+    async function fetchKeys() {
+      loading.keys = true
+      const d = (await api('/api/v1/admin/apikeys')).data
+      if (d) keys.value = d.items
+      loading.keys = false
+    }
+    function showCreateKey() { keyForm.value = {user_id:1,name:'',rate_limit:100,expires_at:''}; keyCreateVis.value = true }
+    async function createKey() {
+      keyCreating.value = true
+      const payload = {...keyForm.value}
+      if (payload.expires_at) {
+        // Convert date string to days from now
+        const diff = Math.ceil((new Date(payload.expires_at) - new Date()) / 86400000)
+        payload.expires_days = Math.max(1, diff)
+      } else { payload.expires_days = 365 }
+      delete payload.expires_at
+      const r = await api('/api/v1/admin/apikeys', {method:'POST',body:JSON.stringify(payload)})
+      if (r.code===0) { keyCreateVis.value = false; newKeyValue.value = r.data?.key; fetchKeys() }
+      else { ElMessage.error(r.message) }
+      keyCreating.value = false
+    }
+    async function revokeKey(id) {
+      try { await ElMessageBox.confirm('撤销后立即失效，确认？') } catch { return }
+      const r = await api('/api/v1/admin/apikeys/'+id, {method:'DELETE'})
+      if (r.code===0) { ElMessage.success('已撤销'); fetchKeys() }
+    }
+    function copyKey() { if (newKeyValue.value) { navigator.clipboard.writeText(newKeyValue.value); ElMessage.success('已复制') } }
+
+    // ─── Init ───
+    function onResize() { trendChart?.resize(); pieChart?.resize() }
+
+    onMounted(async () => {
+      await Promise.all([fetchDashboard(), fetchPlatforms(), fetchCrawlLogs(), fetchArticles(), fetchUsers(), fetchKeys()])
+      buildCrawlStatus()
+      window.addEventListener('resize', onResize)
+    })
+
+    return {
+      navItems, currentPage, navigate,
+      stats, stats2,
+      platforms, loading, platEditVis, platForm, editPlatform, savePlatform, triggerCrawl, fetchPlatforms,
+      crawlStatus, crawlLogs, crawlPage, crawlTotal, fetchCrawlLogs, triggerAllCrawls,
+      articleTab, articles, articlePage, articleTotal, selectedArticles, onArticleSelect, fetchArticles, auditArticle, batchAudit,
+      sensitiveWords, newWord, addSensitiveWord, deleteSensitiveWord,
+      users, userPage, userTotal, selectedUser, userDetailVis, showUserDetail, updateUserStatus, fetchUsers,
+      keys, keyCreateVis, keyCreating, newKeyValue, keyForm, showCreateKey, createKey, revokeKey, copyKey,
+    }
+  }
+})
+app.use(ElementPlus)
+app.mount('#app')
+<\/script>
+</body>
+</html>

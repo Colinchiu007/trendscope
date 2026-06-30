@@ -1,10 +1,11 @@
 """文章相关路由"""
 from fastapi import APIRouter, Depends, Query
+from trendscope.api.middleware.ratelimit import anonymous_rate_limit
 
 from trendscope.api.services.article_service import ArticleService
 from trendscope.api.dependencies import get_article_service
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(anonymous_rate_limit)])
 
 
 @router.get("")
@@ -56,3 +57,13 @@ async def get_article(
     if not data:
         return {"code": 1002, "message": "文章不存在"}
     return {"code": 0, "data": data}
+
+
+@router.get("/{article_id}/related")
+async def get_related_articles(
+    article_id: int,
+    limit: int = Query(5, ge=1, le=20),
+    svc: ArticleService = Depends(get_article_service),
+):
+    items = await svc.get_related(article_id, limit)
+    return {"code": 0, "data": {"items": items}}

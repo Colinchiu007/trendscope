@@ -1,9 +1,10 @@
 """Trending routes."""
 from fastapi import APIRouter, Depends, Query
+from trendscope.api.middleware.ratelimit import anonymous_rate_limit
 from trendscope.api.services.trending_service import TrendingService
 from trendscope.api.dependencies import get_trending_service
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(anonymous_rate_limit)])
 
 
 @router.get("/summary")
@@ -49,6 +50,19 @@ async def get_aggregated_trending(
                        "total": total, "total_pages": total_pages},
     }
 
+
+
+
+
+@router.get("/{topic_id}/related")
+async def get_related_topics(
+    topic_id: int,
+    limit: int = Query(10, ge=1, le=50),
+    svc: TrendingService = Depends(get_trending_service),
+):
+    """获取关联话题推荐"""
+    items = await svc.get_related_topics(topic_id, limit)
+    return {"code": 0, "data": {"items": items}}
 
 @router.get("/{platform}")
 async def get_platform_trending(

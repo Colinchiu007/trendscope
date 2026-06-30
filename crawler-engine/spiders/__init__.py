@@ -12,6 +12,7 @@ from spiders.x_twitter import XTwitterSpider
 from spiders.weixin_article import WeixinArticleSpider
 from spiders.netease import NeteaseSpider
 from spiders.kuaishou import KuaishouSpider
+from spiders.weixin_channel import WeixinChannelSpider
 from spiders.tiktok import TikTokSpider
 
 SPIDER_MAP = {
@@ -27,6 +28,7 @@ SPIDER_MAP = {
     "x_twitter": XTwitterSpider,
     "weixin_article": WeixinArticleSpider,
     "kuaishou": KuaishouSpider,
+    "weixin_channel": WeixinChannelSpider,
     "tiktok": TikTokSpider,
 }
 
