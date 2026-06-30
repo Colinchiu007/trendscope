@@ -146,6 +146,17 @@ class UserSubscription(Base):
     platform = relationship("Platform")
 
 
+class FavoriteFolder(Base):
+    __tablename__ = "favorite_folders"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(128), nullable=False)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=now_utc)
+    updated_at = Column(DateTime, default=now_utc, onupdate=now_utc)
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 

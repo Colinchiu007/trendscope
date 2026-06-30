@@ -90,3 +90,14 @@ def set_redis_client(redis_client):
     """设置 Redis 客户端（用于分布式限流）"""
     global _limiter
     _limiter = RedisTokenBucket(redis_client)
+
+
+
+async def anonymous_rate_limit(request: Request):
+    """公开接口限流（匿名用户，30次/分钟，IP 维度）"""
+    return await rate_limit(request, rate=30)
+
+
+async def authenticated_rate_limit(request: Request):
+    """认证用户接口限流（100次/分钟，IP 维度）"""
+    return await rate_limit(request, rate=100)

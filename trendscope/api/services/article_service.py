@@ -34,6 +34,11 @@ class ArticleService:
         await self.cache.set_article(article_id, result)
         return result
 
+    async def get_related(self, article_id: int, limit: int = 5) -> list[dict]:
+        """关联文章推荐"""
+        items = await self.repo.get_related_articles(article_id, limit)
+        return [_serialize_article(item) for item in items]
+
     async def search(self, q: str, platforms: str = None,
                      page: int = 1, page_size: int = 20) -> tuple[list[dict], int]:
         """全文搜索"""

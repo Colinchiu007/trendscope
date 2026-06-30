@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type {
-  ApiResponse, TrendingListData, Platform, PlatformSummaryItem,
+  ApiResponse, TrendingListData, Platform, PlatformSummaryItem, TrendHistoryData,
 } from "@/lib/types";
 
 async function fetchAggregatedTrending(
@@ -28,6 +28,14 @@ async function fetchPlatforms(): Promise<ApiResponse<{ platforms: Platform[] }>>
 async function fetchPlatformSummary():
   Promise<ApiResponse<{ platforms: PlatformSummaryItem[] }>> {
   return apiClient.get("/trending/summary");
+}
+
+async function fetchTrendingHistory(
+  topicId: number, range = "7d"
+): Promise<ApiResponse<TrendHistoryData>> {
+  return apiClient.get("/trending/history", {
+    params: { topic_id: topicId, range },
+  });
 }
 
 export function useAggregatedTrending(platforms?: string, page = 1) {
@@ -62,5 +70,14 @@ export function usePlatformSummary() {
     queryFn: fetchPlatformSummary,
     staleTime: 60_000,
     refetchInterval: 120_000,
+  });
+}
+
+export function useTrendingHistory(topicId: number, enabled = false, range = "7d") {
+  return useQuery({
+    queryKey: ["trending", "history", topicId, range],
+    queryFn: () => fetchTrendingHistory(topicId, range),
+    staleTime: 300_000,
+    enabled: topicId > 0 && enabled,
   });
 }

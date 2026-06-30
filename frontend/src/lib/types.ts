@@ -19,6 +19,7 @@ export interface TrendingTopic {
   topic_url: string;
   category: string;
   snapshot_at: string;
+  rank_change: number | null;  // positive=up, negative=down, 0=stable, null=new
 }
 
 export interface HotArticle {
@@ -68,4 +69,20 @@ export interface PlatformSummaryItem {
   category: string;
   top3: TrendingTopic[];
   snapshot_at: string | null;
+}
+
+/** History data point */
+export interface TrendHistoryPoint {
+  snapshot_at: string;
+  rank: number;
+  hot_value: string;
+  hot_value_norm: number;
+}
+
+/** History API response */
+export interface TrendHistoryData {
+  topic_id: number;
+  title: string;
+  platform: string;
+  history: TrendHistoryPoint[];
 }

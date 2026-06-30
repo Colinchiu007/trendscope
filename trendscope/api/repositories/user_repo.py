@@ -2,7 +2,7 @@
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from trendscope.api.models.database import User, UserFavorite, UserSubscription, Notification
+from trendscope.api.models.database import User, UserFavorite, UserSubscription, Notification, FavoriteFolder
 
 
 class UserRepo:
@@ -148,6 +148,59 @@ class UserRepo:
             .offset((page - 1) * page_size).limit(page_size)
         result = await self.db.execute(stmt)
         return list(result.scalars().all()), total
+
+
+    # ─── 收藏文件夹 ───
+
+    async def create_folder(self, user_id: int, name: str) -> FavoriteFolder:
+        folder = FavoriteFolder(user_id=user_id, name=name)
+        self.db.add(folder)
+        await self.db.flush()
+        return folder
+
+    async def get_folders(self, user_id: int) -> list[FavoriteFolder]:
+        stmt = (
+            select(FavoriteFolder)
+            .where(FavoriteFolder.user_id == user_id)
+            .order_by(FavoriteFolder.sort_order, FavoriteFolder.created_at)
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def update_folder(self, folder_id: int, user_id: int, name: str) -> bool:
+        folder = await self.db.get(FavoriteFolder, folder_id)
+        if not folder or folder.user_id != user_id:
+            return False
+        folder.name = name
+        await self.db.flush()
+        return True
+
+    async def delete_folder(self, folder_id: int, user_id: int) -> bool:
+        folder = await self.db.get(FavoriteFolder, folder_id)
+        if not folder or folder.user_id != user_id:
+            return False
+        await self.db.delete(folder)
+        await self.db.flush()
+        return True
+
+    # ─── 订阅触发（Task 16）───
+
+    async def find_matching_subscriptions(self, platform_id: int, title: str) -> list[UserSubscription]:
+        """查找匹配关键词的订阅"""
+        stmt = select(UserSubscription).where(
+            UserSubscription.is_active == True,
+            UserSubscription.platform_id == platform_id,
+        )
+        result = await self.db.execute(stmt)
+        subs = result.scalars().all()
+        matched = []
+        for sub in subs:
+            if sub.keywords:
+                for kw in sub.keywords:
+                    if kw.lower() in title.lower():
+                        matched.append(sub)
+                        break
+        return matched
 
     async def create_notification(self, user_id: int, type_: str,
                                   title: str, content: str = None,

@@ -8,6 +8,7 @@ from trendscope.api.middleware.security import (
     SecurityHeadersMiddleware,
     RequestSizeLimitMiddleware,
 )
+from trendscope.api.middleware.request_id import RequestIDMiddleware
 from trendscope.api.routers import trending, articles, user, admin, admin as admin_public, partner, last30days
 
 app = FastAPI(
@@ -28,6 +29,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request ID 中间件（最外层，确保所有响应包含 request_id）
+app.add_middleware(RequestIDMiddleware)
 
 # 注册路由 — 使用 prefix 直接挂载
 app.include_router(trending.router, prefix="/api/v1/trending", tags=["热榜"])

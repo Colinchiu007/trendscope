@@ -30,6 +30,11 @@ async function searchArticles(
   return apiClient.get("/articles/search", { params });
 }
 
+async function fetchRelatedArticles(articleId: number):
+  Promise<ApiResponse<{ items: HotArticle[] }>> {
+  return apiClient.get(`/articles/${articleId}/related`, { params: { limit: 5 } });
+}
+
 export function useArticles(platforms?: string, timeRange = "24h", page = 1) {
   return useQuery({
     queryKey: ["articles", platforms, timeRange, page],
@@ -44,6 +49,15 @@ export function useArticle(id: number) {
     queryFn: () => fetchArticle(id),
     staleTime: 300_000,
     enabled: id > 0,
+  });
+}
+
+export function useRelatedArticles(articleId: number) {
+  return useQuery({
+    queryKey: ["articles", "related", articleId],
+    queryFn: () => fetchRelatedArticles(articleId),
+    staleTime: 300_000,
+    enabled: articleId > 0,
   });
 }
 

@@ -1,6 +1,6 @@
 """管理后台路由"""
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from trendscope.api.middleware.auth import require_admin
@@ -11,6 +11,8 @@ from trendscope.api.repositories.apikey_repo import ApiKeyRepo
 from trendscope.api.repositories.article_repo import ArticleRepo
 from trendscope.api.models.database import User
 from sqlalchemy import select, func
+import os
+import json
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -372,3 +374,94 @@ async def export_credentials_as_env(
     text = "\n".join(lines)
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse(text)
+
+
+
+
+# ─── 采集实时状态（Task 17）───
+
+@router.get("/crawl/status")
+async def get_crawl_status(db: AsyncSession = Depends(get_db)):
+    repo = AdminRepo(db)
+    items = await repo.get_crawl_status()
+    return {"code": 0, "data": {"items": items}}
+
+
+# ─── 批量审核（Task 18）───
+
+class BatchAuditReq(BaseModel):
+    article_ids: list[int] = Field(..., min_length=1, max_length=100)
+    status: str = Field(..., pattern=r"^(approved|rejected|pending)$")
+
+
+@router.post("/articles/batch-audit")
+async def batch_audit(
+    req: BatchAuditReq,
+    db: AsyncSession = Depends(get_db),
+):
+    repo = AdminRepo(db)
+    count = await repo.batch_audit_articles(req.article_ids, req.status)
+    return {"code": 0, "message": f"已审核 {count} 篇文章", "data": {"affected": count}}
+
+
+# ─── 用户详情统计（Task 19）───
+
+@router.get("/users/{user_id}/stats")
+async def get_user_stats(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    repo = AdminRepo(db)
+    stats = await repo.get_user_stats(user_id)
+    return {"code": 0, "data": stats}
+# ─── 敏感词管理（JSON 文件存储） ───
+
+_SENSITIVE_WORDS_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "sensitive_words.json"
+)
+
+
+def _ensure_data_dir():
+    os.makedirs(os.path.dirname(_SENSITIVE_WORDS_FILE), exist_ok=True)
+
+
+def _load_words() -> list[str]:
+    _ensure_data_dir()
+    if os.path.exists(_SENSITIVE_WORDS_FILE):
+        with open(_SENSITIVE_WORDS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+def _save_words(words: list[str]):
+    _ensure_data_dir()
+    with open(_SENSITIVE_WORDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(words, f, ensure_ascii=False, indent=2)
+
+
+class SensitiveWordReq(BaseModel):
+    word: str = Field(..., min_length=1, max_length=100)
+
+
+@router.get("/sensitive-words")
+async def list_sensitive_words():
+    return {"code": 0, "data": {"words": _load_words()}}
+
+
+@router.post("/sensitive-words")
+async def add_sensitive_word(req: SensitiveWordReq):
+    words = _load_words()
+    if req.word not in words:
+        words.append(req.word)
+        _save_words(words)
+    return {"code": 0, "message": "添加成功", "data": {"words": words}}
+
+
+@router.delete("/sensitive-words/{word:path}")
+async def delete_sensitive_word(word: str):
+    words = _load_words()
+    if word in words:
+        words.remove(word)
+        _save_words(words)
+    return {"code": 0, "message": "删除成功", "data": {"words": words}}

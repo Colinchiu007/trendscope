@@ -6,6 +6,7 @@ tests/conftest.py
 tests/test_api.py
 tests/test_pipeline.py
 tests/test_services.py
+tests/test_sms_login.py
 trendscope/__init__.py
 trendscope.egg-info/PKG-INFO
 trendscope.egg-info/SOURCES.txt
@@ -17,10 +18,12 @@ trendscope/api/config.py
 trendscope/api/dependencies.py
 trendscope/api/main.py
 trendscope/api/cache/__init__.py
+trendscope/api/cache/sms_cache.py
 trendscope/api/cache/trending_cache.py
 trendscope/api/middleware/__init__.py
 trendscope/api/middleware/auth.py
 trendscope/api/middleware/ratelimit.py
+trendscope/api/middleware/request_id.py
 trendscope/api/middleware/security.py
 trendscope/api/models/__init__.py
 trendscope/api/models/database.py
@@ -36,11 +39,13 @@ trendscope/api/repositories/user_repo.py
 trendscope/api/routers/__init__.py
 trendscope/api/routers/admin.py
 trendscope/api/routers/articles.py
+trendscope/api/routers/last30days.py
 trendscope/api/routers/partner.py
 trendscope/api/routers/trending.py
 trendscope/api/routers/user.py
 trendscope/api/services/__init__.py
 trendscope/api/services/article_service.py
+trendscope/api/services/last30days_search.py
 trendscope/api/services/trending_service.py
 trendscope/api/services/user_service.py
 trendscope/crawler/__init__.py

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrendScope 管理后台 - 数据面板</title>
+  <!-- Element Plus CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
+    #app { min-height: 100vh; }
+    .el-header { background: #fff; border-bottom: 1px solid #ebeef5; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; }
+    .el-header h3 { margin: 0; font-size: 16px; color: #303133; }
+    .version { color: #999; font-size: 12px; }
+    .el-aside { background: #fafafa; border-right: 1px solid #ebeef5; width: 200px; overflow-y: auto; }
+    .el-main { background: #f5f5f5; padding: 24px; min-height: calc(100vh - 56px); }
+    .stat-card { text-align: center; padding: 8px 0; }
+    .stat-value { font-size: 28px; font-weight: 700; color: #409eff; }
+    .stat-label { font-size: 13px; color: #999; margin-top: 4px; }
+    .el-menu-item { cursor: pointer; }
+    .el-menu-item.is-active { color: #409eff; background: #ecf5ff; }
+    .chart-container { width: 100%; height: 320px; }
+    .el-card { margin-bottom: 16px; }
+
+    /* Loading skeleton */
+    .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <el-container style="min-height:100vh">
+      <el-header>
+        <h3>热榜 TrendScope - 管理后台</h3>
+        <span class="version">v0.1.0</span>
+      </el-header>
+      <el-container>
+        <el-aside>
+          <el-menu>
+            <el-menu-item index="/dashboard" class="is-active"><span>数据面板</span></el-menu-item>
+            <el-menu-item index="/platforms"><span>平台管理</span></el-menu-item>
+            <el-menu-item index="/crawl"><span>采集调度</span></el-menu-item>
+            <el-menu-item index="/articles"><span>内容审核</span></el-menu-item>
+            <el-menu-item index="/users"><span>用户管理</span></el-menu-item>
+            <el-menu-item index="/apikeys"><span>API Key 管理</span></el-menu-item>
+          </el-menu>
+        </el-aside>
+        <el-main>
+          <h2 style="margin-bottom:20px;font-size:18px;color:#303133">数据面板</h2>
+
+          <!-- Stat cards -->
+          <el-row :gutter="16" style="margin-bottom:24px">
+            <el-col :span="6" v-for="card in stats" :key="card.key">
+              <el-card shadow="hover">
+                <div class="stat-card">
+                  <div class="stat-value">{{ card.value }}</div>
+                  <div class="stat-label">{{ card.label }}</div>
+                </div>
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <!-- Charts row -->
+          <el-row :gutter="16">
+            <el-col :span="16">
+              <el-card>
+                <template #header>访问趋势（7天）</template>
+                <div id="trendChart" class="chart-container"></div>
+              </el-card>
+            </el-col>
+            <el-col :span="8">
+              <el-card>
+                <template #header>平台分布</template>
+                <div id="pieChart" class="chart-container"></div>
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <!-- Crawl logs -->
+          <el-card style="margin-top:16px">
+            <template #header>最近采集日志</template>
+            <el-table :data="crawlLogs" stripe empty-text="暂无采集记录" v-loading="loadingLogs">
+              <el-table-column prop="platform_name" label="平台" width="120" />
+              <el-table-column prop="status" label="状态" width="100" />
+              <el-table-column prop="items_count" label="采集条数" width="100" />
+              <el-table-column prop="duration_ms" label="耗时(ms)" width="100" />
+              <el-table-column prop="started_at" label="时间" />
+            </el-table>
+          </el-card>
+        </el-main>
+      </el-container>
+    </el-container>
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\/script>
+  <script src="https://unpkg.com/element-plus"><\/script>
+  <script src="https://unpkg.com/echarts"><\/script>
+
+  <script>
+    const { createApp, ref, onMounted, nextTick } = Vue
+
+    const app = createApp({
+      setup() {
+        const stats = ref([
+          { key: 'active_platforms', label: '活跃平台', value: '-' },
+          { key: 'active_users', label: '活跃用户', value: '-' },
+          { key: 'today_articles', label: '今日文章', value: '-' },
+          { key: 'today_topics', label: '今日话题', value: '-' },
+        ])
+
+        const secondRow = ref([
+          { key: 'today_api_calls', label: 'API 调用', value: '-' },
+          { key: 'crawl_success_rate', label: '采集成功率', value: '-' },
+          { key: 'total_articles', label: '累计文章', value: '-' },
+          { key: 'total_topics', label: '累计话题', value: '-' },
+        ])
+
+        const crawlLogs = ref([])
+        const loadingLogs = ref(false)
+
+        let trendChart = null
+        let pieChart = null
+
+        async function fetchDashboard() {
+          try {
+            const res = await fetch('/api/v1/admin/dashboard')
+            const json = await res.json()
+            if (json.code !== 0) return
+
+            const d = json.data
+            const s = d.stats || {}
+
+            stats.value = [
+              { key: 'active_platforms', label: '活跃平台', value: s.active_platforms ?? '-' },
+              { key: 'active_users', label: '活跃用户', value: s.active_users ?? '-' },
+              { key: 'today_articles', label: '今日文章', value: s.today_articles ?? '-' },
+              { key: 'today_topics', label: '今日话题', value: s.today_topics ?? '-' },
+            ]
+            secondRow.value = [
+              { key: 'today_api_calls', label: 'API 调用', value: s.today_api_calls ?? '-' },
+              { key: 'crawl_success_rate', label: '采集成功率', value: (s.crawl_success_rate ?? '-') + '%' },
+              { key: 'total_articles', label: '累计文章', value: s.total_articles ?? '-' },
+              { key: 'total_topics', label: '累计话题', value: s.total_topics ?? '-' },
+            ]
+
+            // Render charts on next tick
+            await nextTick()
+            renderTrendChart(d.visit_trend || [])
+            renderPieChart(d.platform_distribution || [])
+          } catch (e) {
+            console.error('Dashboard data load failed:', e)
+          }
+        }
+
+        async function fetchCrawlLogs() {
+          loadingLogs.value = true
+          try {
+            const res = await fetch('/api/v1/admin/crawl/logs?page=1&page_size=10')
+            const json = await res.json()
+            if (json.code === 0) {
+              crawlLogs.value = (json.data?.items || []).map(log => ({
+                ...log,
+                platform_name: log.platform_id || '-',
+              }))
+            }
+          } catch (e) {
+            console.error('Crawl logs load failed:', e)
+          } finally {
+            loadingLogs.value = false
+          }
+        }
+
+        function renderTrendChart(data) {
+          const el = document.getElementById('trendChart')
+          if (!el) return
+          if (!trendChart) trendChart = echarts.init(el)
+          trendChart.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+            xAxis: { type: 'category', data: data.map(d => d.date ? d.date.slice(5) : ''), boundaryGap: false },
+            yAxis: { type: 'value', minInterval: 1 },
+            series: [{ type: 'line', smooth: true, data: data.map(d => d.count), areaStyle: { opacity: 0.25 }, lineStyle: { width: 2 }, itemStyle: { color: '#409eff' } }],
+          })
+        }
+
+        function renderPieChart(data) {
+          const el = document.getElementById('pieChart')
+          if (!el) return
+          if (!pieChart) pieChart = echarts.init(el)
+          pieChart.setOption({
+            tooltip: { trigger: 'item' },
+            series: [{
+              type: 'pie', radius: ['30%', '60%'],
+              data: data.map(d => ({ name: d.name || '-', value: d.count })),
+              label: { show: true, formatter: '{b}: {c}' },
+            }],
+          })
+        }
+
+        function onResize() { trendChart?.resize(); pieChart?.resize() }
+
+        onMounted(() => {
+          fetchDashboard()
+          fetchCrawlLogs()
+          window.addEventListener('resize', onResize)
+        })
+
+        return { stats, secondRow, crawlLogs, loadingLogs }
+      }
+    })
+
+    app.use(ElementPlus)
+    app.mount('#app')
+  </script>
+</body>
+</html>

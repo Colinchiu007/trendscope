@@ -1,5 +1,6 @@
 """文章数据访问层"""
 from datetime import datetime, timedelta, timezone
+import re
 
 from sqlalchemy import select, func, and_, or_, desc, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,6 +55,85 @@ class ArticleRepo:
         stmt = select(HotArticle).where(HotArticle.id == article_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def get_related_articles(
+        self, article_id: int, limit: int = 5
+    ) -> list[HotArticle]:
+        """获取关联文章推荐。
+
+        策略：提取文章标题关键词 → 优先同平台匹配 → 补充跨平台结果。
+        排除自身。
+        """
+        article = await self.get_article(article_id)
+        if not article:
+            return []
+
+        # 从标题提取关键词（中文/英文单词，过滤过短的）
+        keywords = self._extract_keywords(article.title, min_len=2)
+        if not keywords:
+            return []
+
+        # 构建 LIKE 条件
+        like_conditions = [
+            HotArticle.title.ilike(f"%{kw}%")
+            for kw in keywords[:5]  # 最多取前 5 个关键词
+        ]
+
+        if not like_conditions:
+            return []
+
+        # 同平台优先
+        same_platform = (
+            select(HotArticle)
+            .where(
+                and_(
+                    HotArticle.platform_id == article.platform_id,
+                    HotArticle.id != article_id,
+                    HotArticle.status == "approved",
+                    or_(*like_conditions),
+                )
+            )
+            .order_by(desc(HotArticle.read_count))
+            .limit(limit)
+        )
+        result = await self.db.execute(same_platform)
+        same_platform_items = list(result.scalars().all())
+
+        if len(same_platform_items) >= limit:
+            return same_platform_items[:limit]
+
+        # 补充跨平台结果（排除已有的）
+        existing_ids = {a.id for a in same_platform_items}
+        existing_ids.add(article_id)
+
+        cross_platform = (
+            select(HotArticle)
+            .where(
+                and_(
+                    HotArticle.id.notin_(list(existing_ids)),
+                    HotArticle.status == "approved",
+                    or_(*like_conditions),
+                )
+            )
+            .order_by(desc(HotArticle.read_count))
+            .limit(limit - len(same_platform_items))
+        )
+        result = await self.db.execute(cross_platform)
+        cross_items = list(result.scalars().all())
+
+        return same_platform_items + cross_items
+
+    @staticmethod
+    def _extract_keywords(title: str, min_len: int = 2) -> list[str]:
+        """从标题中提取关键词"""
+        # 按常见分隔符拆分
+        parts = re.split(r"[\s,，。、：:；;！!？?/（）()\[\]【】「」{}]+", title)
+        keywords = []
+        for p in parts:
+            p = p.strip()
+            if len(p) >= min_len:
+                keywords.append(p)
+        return keywords
 
     async def search_articles(
         self, q: str, platform_ids: list[int] = None,

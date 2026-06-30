@@ -14,6 +14,7 @@ const { Text, Paragraph } = Typography;
 
 interface ArticleCardProps {
   article: HotArticle;
+  highlightKeyword?: string;
 }
 
 function formatCount(n: number): string {
@@ -22,7 +23,23 @@ function formatCount(n: number): string {
   return `${n}`;
 }
 
-export function ArticleCard({ article }: ArticleCardProps) {
+/** 高亮匹配关键词 */
+function HighlightText({ text, keyword }: { text: string; keyword: string }) {
+  if (!keyword || !keyword.trim()) return <>{text}</>;
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === keyword.toLowerCase()
+          ? <mark key={i} style={{ background: "#fff3b0", padding: "0 2px", borderRadius: 2, fontWeight: 500 }}>{part}</mark>
+          : part,
+      )}
+    </>
+  );
+}
+
+export function ArticleCard({ article, highlightKeyword }: ArticleCardProps) {
   const router = useRouter();
   const coverImage = article.images?.[0];
 
@@ -55,7 +72,11 @@ export function ArticleCard({ article }: ArticleCardProps) {
             ellipsis={{ rows: 2 }}
             style={{ fontSize: 16, fontWeight: 500, marginBottom: 8, lineHeight: 1.5 }}
           >
-            {article.title}
+            {highlightKeyword ? (
+              <HighlightText text={article.title} keyword={highlightKeyword} />
+            ) : (
+              article.title
+            )}
           </Paragraph>
           {article.summary && (
             <Paragraph
@@ -63,7 +84,11 @@ export function ArticleCard({ article }: ArticleCardProps) {
               ellipsis={{ rows: 2 }}
               style={{ fontSize: 13, marginBottom: 8 }}
             >
-              {article.summary}
+              {highlightKeyword ? (
+                <HighlightText text={article.summary} keyword={highlightKeyword} />
+              ) : (
+                article.summary
+              )}
             </Paragraph>
           )}
 

@@ -71,5 +71,8 @@ def get_article_service(
 
 def get_user_service(
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ) -> UserService:
-    return UserService(db)
+    from trendscope.api.cache.sms_cache import SmsCache
+    sms_cache = SmsCache(redis_client=redis)
+    return UserService(db, sms_cache=sms_cache)

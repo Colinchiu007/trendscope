@@ -34,6 +34,41 @@ class TrendingRepo:
         result = await self.db.execute(stmt)
         return result.scalar()
 
+    async def get_previous_snapshot_ranks(
+        self, platform_id: int, current_time: datetime
+    ) -> dict[str, int]:
+        """获取上一次快照中各话题的排名，用于计算 rank_change。
+
+        通过查找晚于 current_time 的第二最新快照时间，返回 {title: rank} 映射。
+        """
+        # 找早于 current_time 的最新快照时间
+        stmt = (
+            select(func.max(TrendingTopic.snapshot_at))
+            .where(
+                and_(
+                    TrendingTopic.platform_id == platform_id,
+                    TrendingTopic.snapshot_at < current_time,
+                )
+            )
+        )
+        result = await self.db.execute(stmt)
+        prev_time = result.scalar()
+        if not prev_time:
+            return {}
+
+        # 获取上一次快照的所有排名
+        prev_stmt = (
+            select(TrendingTopic.title, TrendingTopic.rank)
+            .where(
+                and_(
+                    TrendingTopic.platform_id == platform_id,
+                    TrendingTopic.snapshot_at == prev_time,
+                )
+            )
+        )
+        result = await self.db.execute(prev_stmt)
+        return {row[0]: row[1] for row in result.all()}
+
     async def get_aggregated_trending(
         self, platform_ids: list[int] = None, category: str = "all",
         page: int = 1, page_size: int = 20
@@ -194,3 +229,41 @@ class TrendingRepo:
         self.db.add(log_entry)
         await self.db.flush()
         return log_entry
+
+
+    async def get_related_topics(self, topic_id: int, limit: int = 10) -> list[dict]:
+        """获取关联话题（同平台/同分类的热门话题）"""
+        from sqlalchemy import select
+
+        # First get the source topic
+        src = await self.db.execute(
+            select(TrendingTopic).where(TrendingTopic.id == topic_id)
+        )
+        topic = src.scalar_one_or_none()
+        if not topic:
+            return []
+
+        # Find related by same platform, excluding the topic itself
+        stmt = (
+            select(TrendingTopic)
+            .where(
+                TrendingTopic.platform_id == topic.platform_id,
+                TrendingTopic.id != topic_id,
+            )
+            .order_by(TrendingTopic.hot_value_norm.desc().nullslast())
+            .limit(limit)
+        )
+        result = await self.db.execute(stmt)
+        items = result.scalars().all()
+        return [
+            {
+                "id": t.id,
+                "title": t.title,
+                "rank": t.rank,
+                "hot_value": t.hot_value,
+                "hot_value_norm": t.hot_value_norm,
+                "topic_url": t.topic_url,
+                "snapshot_at": t.snapshot_at.isoformat() if t.snapshot_at else "",
+            }
+            for t in items
+        ]
