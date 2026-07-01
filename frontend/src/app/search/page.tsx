@@ -247,4 +247,3 @@ export default function SearchPage() {
     </Layout>
   );
 }
-                                      

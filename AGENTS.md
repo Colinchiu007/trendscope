@@ -82,63 +82,14 @@ CRITICAL 必须修复才能继续。
 - git 提交并 tag
 - 部署后验证 Celery Beat + Worker 正常启动
 
-## 质量门禁
 
-**PRD 阶段**：MVP 范围清晰 / 验收标准可验证
-**设计阶段**：最简单方案 / 爬虫 + 缓存 + API 设计明确
-**开发阶段**：测试全通过 / 手动冒烟通过 / 爬虫集成测试通过
-**Review 阶段**：CRITICAL 问题已修复 / 反爬策略到位
-**发布阶段**：CHANGELOG 更新 / 冒烟测试通过 / Celery 正常启动
+## 详细规范
 
-## TDD 流程
+本文档只包含开发流程框架。详细规范已拆分到 `references/` 子目录：
 
-```
-RED   → 在 tests/ 下写失败测试
-         API 测试：TestClient 模拟请求
-         服务层测试：mock repository
-         爬虫测试：scripts/test_*.py（不纳入 CI）
-GREEN → 最小实现让测试通过
-REFACTOR → 重构，保持测试通过
-```
-
-### 测试组织
-
-```
-tests/
-+-- conftest.py          # 共享 fixture（async_client, db_session）
-+-- test_api.py          # API 端点测试
-+-- test_services.py     # 服务层测试
-+-- test_pipeline.py     # 管道测试（CI 中排除）
-
-scripts/
-+-- test_all_http.py     # 全量 HTTP 爬虫集成测试
-+-- test_http_spiders.py # HTTP 爬虫专项测试
-```
-
-### 测试规范
-
-```python
-# tests/test_api.py
-async def test_trending_returns_data(async_client):
-    resp = await async_client.get("/api/v1/trending")
-    assert resp.status_code == 200
-    assert resp.json()["code"] == 0
-
-# tests/test_services.py
-async def test_get_trending_calls_cache_and_repo(trending_service, mock_cache, mock_repo):
-    result = await trending_service.get_trending("weibo")
-    assert mock_cache.get.called
-    assert mock_repo.get.called
-```
-
-## 提交规范
-
-```
-feat(weibo): 添加微博热搜爬虫
-fix(cache): 修复采集后缓存未失效
-docs: 更新 API_SPEC.md 平台列表
-refactor: 统一错误码处理
-```
+- **[references/testing.md](references/testing.md)** — TDD 流程与测试规范
+- **[references/quality-gates.md](references/quality-gates.md)** — 质量门禁详细说明
+- **[references/commits.md](references/commits.md)** — 提交规范
 
 ## 文档清单
 

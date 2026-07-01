@@ -3,10 +3,12 @@ pyproject.toml
 setup.py
 tests/__init__.py
 tests/conftest.py
+tests/test_admin_api.py
 tests/test_api.py
 tests/test_pipeline.py
 tests/test_services.py
 tests/test_sms_login.py
+tests/test_user_auth.py
 trendscope/__init__.py
 trendscope.egg-info/PKG-INFO
 trendscope.egg-info/SOURCES.txt
